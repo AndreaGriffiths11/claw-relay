@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">🦀</div>
+      <h1>Claw Relay</h1>
+    </div>
+
+    <div class="tab-info" id="tabInfo">
+      <span class="tab-favicon" id="tabFavicon"></span>
+      <span class="tab-title" id="tabTitle">Loading...</span>
+    </div>
+
+    <div class="toggle-row">
+      <label class="toggle-label">Relay Active</label>
+      <label class="switch">
+        <input type="checkbox" id="relayToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div id="activeSection" class="hidden">
+      <div class="status-row">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Waiting for agent...</span>
+      </div>
+
+      <div class="token-section">
+        <label class="section-label">Auth Token</label>
+        <div class="token-row">
+          <code class="token" id="tokenDisplay">————</code>
+          <button class="btn-icon" id="copyToken" title="Copy">📋</button>
+        </div>
+        <div class="hint">Agent connects to <code>ws://localhost:19222</code></div>
+      </div>
+
+      <div class="permissions-section">
+        <label class="section-label">Permissions</label>
+        <div class="perm-grid">
+          <label class="perm"><input type="checkbox" value="read" checked disabled> Read</label>
+          <label class="perm"><input type="checkbox" value="interact" id="permInteract"> Interact</label>
+          <label class="perm"><input type="checkbox" value="navigate" id="permNavigate"> Navigate</label>
+          <label class="perm"><input type="checkbox" value="execute" id="permExecute"> Execute</label>
+        </div>
+      </div>
+
+      <button class="btn-danger" id="revokeBtn">Revoke Access</button>
+    </div>
+
+    <div class="footer">
+      <a href="#" id="auditLink">View Audit Log</a>
+      <span class="version">v0.1.0</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

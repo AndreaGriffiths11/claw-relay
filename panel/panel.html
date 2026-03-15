@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div class="panel-container">
+    <div class="panel-header">
+      <h2>🦀 Audit Log</h2>
+      <button id="clearBtn" class="btn-clear">Clear</button>
+    </div>
+    <div class="log-table" id="logContainer">
+      <div class="log-header-row">
+        <span class="col-time">Time</span>
+        <span class="col-action">Action</span>
+        <span class="col-detail">Detail</span>
+      </div>
+      <div id="logBody"></div>
+    </div>
+    <div class="empty-state" id="emptyState">No actions logged yet.</div>
+  </div>
+  <script src="panel.js"></script>
+</body>
+</html>
