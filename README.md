@@ -105,13 +105,9 @@ Control what the agent can do:
 
 Default: `read` + `interact`
 
-## Remote Agents (Tailscale, Cloudflare Tunnel)
+## Remote Agents
 
-If your agent runs on a remote server (cloud VM, always-on Pi, etc.), you need a way for it to reach the relay on your local machine.
-
-### Option A: Tailscale (Recommended)
-
-The cleanest setup. Both machines join the same [Tailscale](https://tailscale.com) network — private, encrypted, zero config.
+If your agent runs on a remote server (cloud VM, always-on Pi, etc.), use [Tailscale](https://tailscale.com) to connect. It's free, private, and takes 2 minutes.
 
 1. Install Tailscale on both your Mac and the agent's server
 2. Start the relay server on your Mac: `node relay/server.js`
@@ -122,16 +118,6 @@ ws://your-mac.tailnet:19222?role=agent&token=YOUR_TOKEN
 ```
 
 No tunnels, no port forwarding, no public exposure. WireGuard-encrypted end-to-end.
-
-### Option B: Cloudflare Tunnel
-
-Temporary public URL — good for quick testing, not permanent setups.
-
-```bash
-npx cloudflared tunnel --url ws://localhost:19222
-```
-
-Copy the generated URL and give it to your agent.
 
 ## Security
 
