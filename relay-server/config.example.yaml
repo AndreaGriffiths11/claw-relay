@@ -1,16 +1,16 @@
 server:
   port: 9333  # Don't use 9222 — that's Chrome's CDP port
-  host: "127.0.0.1"
+  host: "0.0.0.0"
 
 agents:
   deploy-bot:
-    token: "secret-token-1"
+    token: "secret-token-1"      # change this
     scopes: ["read", "interact", "navigate"]
     allowlist: ["dash.cloudflare.com", "github.com"]
     rateLimit: 30
 
   research-bot:
-    token: "secret-token-2"
+    token: "secret-token-2"      # change this
     scopes: ["read"]
     allowlist: ["*"]
     rateLimit: 60

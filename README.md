@@ -57,18 +57,24 @@ If you prefer to run each piece manually, keep reading.
 
 ## Manual Setup
 
-### 1. Install agent-browser
+### Prerequisites
 
 ```bash
-npm install -g agent-browser
+npm install -g agent-browser    # browser automation engine
+brew install cloudflared        # only if you want remote access (optional)
 ```
 
-### 2. Set up the relay
+### 1. Build the relay
 
 ```bash
 cd relay-server
-npm install
-npx tsc
+npm install          # ← must be inside relay-server/, not the repo root
+npx tsc              # ← compiles TypeScript — required before first run
+```
+
+### 2. Configure
+
+```bash
 cp config.example.yaml config.yaml
 ```
 
@@ -76,17 +82,17 @@ Edit `config.yaml`:
 
 ```yaml
 server:
-  port: 9333
-  host: "127.0.0.1"
+  port: 9333              # ⚠️ Do NOT use 9222 — that's Chrome's debugging port
+  host: "0.0.0.0"         # accepts connections from tunnels and local
 
 agents:
   my-agent:
-    token: "pick-a-strong-secret"
-    scopes: ["read"]           # start here
-    allowlist: ["github.com"]  # be specific
+    token: "pick-a-strong-secret"   # change this
+    scopes: ["read"]                # start with read, add more later
+    allowlist: ["github.com"]       # be specific — avoid ["*"]
     rateLimit: 30
 
-blocklist:
+blocklist:                # global — always wins over allowlists
   - "*.bank.com"
   - "mail.google.com"
   - "accounts.google.com"
@@ -100,19 +106,23 @@ engine:
   timeout: 30000
 ```
 
+> **⚠️ YAML gotcha:** Each key can only appear once per block. If you're editing and want to change `host`, replace the line — don't add a second `host:` line or YAML will crash with `DUPLICATE_KEY`.
+
 ### 3. Launch Chrome with remote debugging
 
-Quit Chrome first (Cmd+Q / close all windows), then:
+**You must quit Chrome completely first** (Cmd+Q on macOS, not just close windows). The debug port won't bind if Chrome is already running.
 
 ```bash
-# Clean profile (recommended for testing):
+# macOS:
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
   --remote-debugging-port=9222 \
   --user-data-dir=/tmp/chrome-debug
 
-# Or on Linux:
+# Linux:
 google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 ```
+
+> **Why `--user-data-dir`?** Chrome refuses to enable remote debugging without it. Use `/tmp/chrome-debug` for a clean test profile, or point it to your real profile once you trust the setup.
 
 ### 4. Connect agent-browser to Chrome
 
@@ -120,11 +130,17 @@ google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 agent-browser connect http://localhost:9222
 ```
 
+> **Note:** The syntax is just `agent-browser connect <url>` — no `--cdp-url` flag.
+
 ### 5. Start the relay
 
 ```bash
 node dist/index.js config.yaml
 ```
+
+> **Note:** The config file is a required CLI argument — it's not auto-loaded.
+
+You should see: `Claw Relay server listening on 0.0.0.0:9333`
 
 ### 6. Test it
 
@@ -180,26 +196,16 @@ Connect to `ws://localhost:9333` (configurable).
 
 To let a remote agent connect to your browser, you need a tunnel. The relay stays on your machine — the tunnel just makes it reachable.
 
-**Important:** Before using any tunnel, change your `config.yaml` host to accept non-localhost connections:
-
-```yaml
-server:
-  port: 9333
-  host: "0.0.0.0"  # required for tunnels (default "127.0.0.1" only accepts local connections)
-```
-
-Restart the relay after changing this.
-
 ### Option A: Cloudflare Quick Tunnel (easiest, no account needed)
 
 ```bash
-brew install cloudflared  # or: apt install cloudflared
+brew install cloudflared
 cloudflared tunnel --url http://localhost:9333
 ```
 
 You'll get a URL like `https://random-words.trycloudflare.com`. The remote agent connects to `wss://random-words.trycloudflare.com/`.
 
-> **Note:** Quick tunnels are temporary — the URL changes every time you restart. For persistent tunnels, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps).
+> **Note:** Quick tunnels are temporary — the URL changes every time you restart cloudflared. For persistent tunnels, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps).
 
 ### Option B: Tailscale (if both machines are on the same tailnet)
 
@@ -216,6 +222,19 @@ Use the provided `https://xxxx.ngrok-free.app` URL.
 ### Security Note
 
 The tunnel exposes your relay to the internet, but every connection still requires a valid agent token. Without one, the relay rejects the connection. The allowlist, blocklist, scopes, and rate limiting all still apply — the tunnel is just transport.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `DUPLICATE_KEY` YAML error | You have two `host:` lines (or similar). Replace the line, don't add a second one. |
+| Chrome won't start with debugging | Quit Chrome completely first (Cmd+Q). The debug port can't bind while Chrome is running. |
+| `DevTools remote debugging requires a non-default data directory` | Add `--user-data-dir=/tmp/chrome-debug` to your Chrome launch command. |
+| `502` from tunnel | The relay server isn't running. Start it with `node dist/index.js config.yaml`. |
+| `Connection refused` on port 9333 | Either the relay isn't running, or `host` is set to `"127.0.0.1"` and you're connecting from outside. Change to `"0.0.0.0"`. |
+| Tunnel URL stopped working | Quick tunnels are ephemeral. Restart `cloudflared tunnel` to get a new URL. |
+| `agent-browser connect` errors | Make sure Chrome is running with `--remote-debugging-port=9222` and the port is reachable. |
+| TypeScript errors / `dist/index.js` not found | Run `npx tsc` inside `relay-server/` to compile. |
 
 ## Chrome Extension
 
@@ -234,10 +253,6 @@ Every action is logged to `audit.jsonl`:
 {"timestamp":"2026-03-16T14:17:20.639Z","agent_id":"deploy-bot","action":"navigate","target":"https://mail.google.com","ok":false,"duration_ms":0,"error":"site_blocked"}
 {"timestamp":"2026-03-16T14:17:20.985Z","agent_id":"deploy-bot","action":"click","target":"e1","ok":true,"duration_ms":175}
 ```
-
-## Port Note
-
-Don't use port `9222` for the relay — that's Chrome's CDP port. Use `9333` or anything else.
 
 ## License
 
