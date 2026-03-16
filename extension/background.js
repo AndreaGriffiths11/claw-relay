@@ -1,40 +1,45 @@
-// Claw Relay background service worker
+const RELAY_URL = 'http://localhost:9333';
+const CHECK_INTERVAL = 30000;
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'toggle') {
-    console.log(`Relay ${msg.enabled ? 'enabled' : 'disabled'}`);
-    if (msg.enabled) {
-      chrome.action.setBadgeText({ text: 'ON' });
-      chrome.action.setBadgeBackgroundColor({ color: '#00e676' });
-    } else {
-      chrome.action.setBadgeText({ text: '' });
-    }
-  }
-  sendResponse({ ok: true });
-});
-
-// Update current tab URL in state
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
+async function checkHealth() {
   try {
-    const tab = await chrome.tabs.get(activeInfo.tabId);
-    if (tab.url) {
-      chrome.storage.local.get(['relayState'], (result) => {
-        const state = result.relayState || { enabled: false };
-        state.url = tab.url;
-        chrome.storage.local.set({ relayState: state });
+    const resp = await fetch(`${RELAY_URL}/health`, { signal: AbortSignal.timeout(5000) });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      chrome.action.setBadgeText({ text: 'ON' });
+      chrome.action.setBadgeBackgroundColor({ color: '#39d353' });
+      chrome.storage.local.set({
+        connected: true,
+        lastCheck: Date.now(),
+        agent: data.agent || null,
+        recentActions: data.recentActions || []
       });
+    } else {
+      setOffline();
     }
-  } catch {}
-});
+  } catch {
+    setOffline();
+  }
+}
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.url) {
-    chrome.storage.local.get(['relayState'], (result) => {
-      const state = result.relayState || { enabled: false };
-      state.url = changeInfo.url;
-      chrome.storage.local.set({ relayState: state });
-    });
+function setOffline() {
+  chrome.action.setBadgeText({ text: 'OFF' });
+  chrome.action.setBadgeBackgroundColor({ color: '#ff7b72' });
+  chrome.storage.local.set({ connected: false, lastCheck: Date.now() });
+}
+
+// Listen for toggle from popup
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'toggle') {
+    if (msg.paused) {
+      chrome.action.setBadgeText({ text: '⏸' });
+      chrome.action.setBadgeBackgroundColor({ color: '#d29922' });
+    } else {
+      checkHealth();
+    }
   }
 });
 
-console.log('Claw Relay service worker started');
+// Initial check + periodic
+checkHealth();
+setInterval(checkHealth, CHECK_INTERVAL);
