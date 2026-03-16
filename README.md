@@ -42,7 +42,20 @@ Agent ──WebSocket──→ Claw Relay ──CLI──→ agent-browser ─�
                       └── Audit log (append-only JSONL)
 ```
 
-## Quick Start
+## Quick Start (One Command)
+
+```bash
+./start.sh                     # starts Chrome + relay + Cloudflare tunnel
+./start.sh --tunnel tailscale  # use Tailscale instead
+./start.sh --no-tunnel         # local only
+./stop.sh                      # stop everything
+```
+
+The launch script handles Chrome, agent-browser, the relay server, and the tunnel in one shot. Ctrl+C to stop.
+
+If you prefer to run each piece manually, keep reading.
+
+## Manual Setup
 
 ### 1. Install agent-browser
 
@@ -190,15 +203,7 @@ You'll get a URL like `https://random-words.trycloudflare.com`. The remote agent
 
 ### Option B: Tailscale (if both machines are on the same tailnet)
 
-Change your `config.yaml` host to `"0.0.0.0"` so it accepts non-localhost connections:
-
-```yaml
-server:
-  port: 9333
-  host: "0.0.0.0"
-```
-
-Then the remote agent connects to `ws://<your-tailscale-ip>:9333`.
+The remote agent connects to `ws://<your-tailscale-ip>:9333`.
 
 ### Option C: ngrok
 
