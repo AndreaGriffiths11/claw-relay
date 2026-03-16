@@ -33,21 +33,6 @@ The blocklist always wins over allowlists. If `*.bank.com` is blocked, no agent 
 
 ![Architecture](docs/architecture.png)
 
-```
-(The ASCII diagram below can stay as fallback / alternative)
-```
-
-```
-Agent ──WebSocket──→ Claw Relay ──CLI──→ agent-browser ──CDP──→ Your Chrome
-                      │
-                      ├── Auth (token per agent)
-                      ├── Scopes (read/interact/navigate/execute)
-                      ├── Allowlist (per agent, glob patterns)
-                      ├── Blocklist (global, always wins)
-                      ├── Rate limiting (token bucket per agent)
-                      └── Audit log (append-only JSONL)
-```
-
 ## Quick Start (One Command)
 
 ```bash
