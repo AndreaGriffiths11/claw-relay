@@ -163,6 +163,45 @@ Connect to `ws://localhost:9333` (configurable).
 {"type": "error", "code": "site_blocked", "message": "mail.google.com is blocked"}
 ```
 
+## Remote Access (Tunneling)
+
+To let a remote agent connect to your browser, you need a tunnel. The relay stays on your machine — the tunnel just makes it reachable.
+
+### Option A: Cloudflare Quick Tunnel (easiest, no account needed)
+
+```bash
+brew install cloudflared  # or: apt install cloudflared
+cloudflared tunnel --url http://localhost:9333
+```
+
+You'll get a URL like `https://random-words.trycloudflare.com`. The remote agent connects to `wss://random-words.trycloudflare.com/`.
+
+> **Note:** Quick tunnels are temporary — the URL changes every time you restart. For persistent tunnels, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps).
+
+### Option B: Tailscale (if both machines are on the same tailnet)
+
+Change your `config.yaml` host to `"0.0.0.0"` so it accepts non-localhost connections:
+
+```yaml
+server:
+  port: 9333
+  host: "0.0.0.0"
+```
+
+Then the remote agent connects to `ws://<your-tailscale-ip>:9333`.
+
+### Option C: ngrok
+
+```bash
+ngrok http 9333
+```
+
+Use the provided `https://xxxx.ngrok-free.app` URL.
+
+### Security Note
+
+The tunnel exposes your relay to the internet, but every connection still requires a valid agent token. Without one, the relay rejects the connection. The allowlist, blocklist, scopes, and rate limiting all still apply — the tunnel is just transport.
+
 ## Chrome Extension
 
 Optional status dashboard:
