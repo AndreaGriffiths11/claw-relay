@@ -6,17 +6,7 @@ A WebSocket relay server + Chrome extension that lets AI agents safely control a
 
 ## Architecture
 
-```
-AI Agent ──WebSocket──▶ Claw Relay Server ──CLI──▶ agent-browser ──CDP──▶ Chrome
-                              │
-                        ┌─────┴─────┐
-                        │ Auth      │
-                        │ Permissions│
-                        │ Allowlist │
-                        │ Rate Limit│
-                        │ Audit Log │
-                        └───────────┘
-```
+![Claw Relay Architecture](docs/architecture.png)
 
 ## Quick Start
 
