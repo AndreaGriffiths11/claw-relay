@@ -167,6 +167,16 @@ Connect to `ws://localhost:9333` (configurable).
 
 To let a remote agent connect to your browser, you need a tunnel. The relay stays on your machine — the tunnel just makes it reachable.
 
+**Important:** Before using any tunnel, change your `config.yaml` host to accept non-localhost connections:
+
+```yaml
+server:
+  port: 9333
+  host: "0.0.0.0"  # required for tunnels (default "127.0.0.1" only accepts local connections)
+```
+
+Restart the relay after changing this.
+
 ### Option A: Cloudflare Quick Tunnel (easiest, no account needed)
 
 ```bash
