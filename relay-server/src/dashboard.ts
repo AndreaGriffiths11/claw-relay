@@ -316,7 +316,16 @@ if (!TOKEN) document.getElementById('auth-modal').classList.remove('hidden');
 
 function saveToken() {
   TOKEN = document.getElementById('token-input').value.trim();
-  if (TOKEN) { localStorage.setItem('claw-dashboard-token', TOKEN); document.getElementById('auth-modal').classList.add('hidden'); refresh(); }
+  if (!TOKEN) return;
+  localStorage.setItem('claw-dashboard-token', TOKEN);
+  api('/api/status').then(() => {
+    document.getElementById('auth-modal').classList.add('hidden');
+    refresh();
+  }).catch(() => {
+    TOKEN = '';
+    localStorage.removeItem('claw-dashboard-token');
+    alert('Invalid token');
+  });
 }
 
 function api(path, opts) {
