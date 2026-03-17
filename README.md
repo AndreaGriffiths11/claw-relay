@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.jpg" alt="Claw Relay" width="400">
+  <img src="assets/logo.png" alt="Claw Relay" width="400">
 </p>
 
 <p align="center">A trust layer between AI agents and your real browser.</p>
