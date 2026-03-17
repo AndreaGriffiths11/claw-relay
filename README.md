@@ -36,6 +36,7 @@ Start with `read` scope only. Add more when you trust the setup.
 | [Dashboard](docs/dashboard.md) | Web UI for managing agents and viewing audit logs |
 | [Protocol](docs/protocol.md) | WebSocket API reference — auth, actions, responses, scopes |
 | [Tunnels](docs/tunnels.md) | Remote access via Cloudflare, Tailscale, or ngrok |
+| [Agent Skill](SKILL.md) | Drop-in skill file for AI agents (OpenClaw, Copilot CLI, Claude) |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
 
 ## Chrome Extension
