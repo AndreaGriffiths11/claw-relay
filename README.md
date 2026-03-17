@@ -154,6 +154,78 @@ ws.on('close', () => process.exit(0));
 
 You should see an accessibility tree of whatever tab is open in Chrome.
 
+## Dashboard
+
+Claw Relay includes a built-in web dashboard for managing agents, viewing live connections, and browsing the audit log.
+
+<p align="center">
+  <img src="docs/dashboard-preview.png" alt="Claw Relay Dashboard" width="700">
+</p>
+
+### Accessing the Dashboard
+
+The dashboard starts automatically with the relay on port `9334` (configurable):
+
+```
+Dashboard running on http://localhost:9334
+```
+
+Open `http://localhost:9334` in your browser. You'll be prompted for the admin token.
+
+### Configuration
+
+Add to your `config.yaml`:
+
+```yaml
+dashboard:
+  port: 9334
+  adminToken: "your-secret-admin-token"
+```
+
+If `adminToken` is not set, it defaults to the first agent's token.
+
+### What You Can Do
+
+- **View connected agents** — see which agents are online, their scopes, allowlists, and last action
+- **Add agents** — create new agents with tokens, scopes, and site allowlists directly from the UI
+- **Edit agents** — update scopes, allowlists, and rate limits (changes write to `config.yaml` and take effect immediately)
+- **Delete agents** — remove agents you no longer need
+- **Browse audit log** — see every action agents have taken, color-coded by success/failure
+- **Monitor stats** — connected agent count, total actions, and server uptime
+
+### Adding a New Agent
+
+1. Click **+ Add Agent**
+2. Enter an agent ID (e.g. `my-copilot`)
+3. Click **Auto-generate** for a secure token, or enter your own
+4. Select scopes:
+   - **read** — snapshots and screenshots only
+   - **navigate** — can open URLs
+   - **interact** — can click, type, fill forms
+   - **execute** — can run JavaScript (use with caution)
+5. Add allowed sites (one per line, e.g. `github.com`)
+6. Set a rate limit (actions per minute)
+7. Click **Create Agent**
+
+The agent can then connect using the WebSocket protocol with the token and agent ID you configured.
+
+### Connecting an Agent
+
+Once configured, agents connect via WebSocket:
+
+```javascript
+const ws = new WebSocket('ws://localhost:9333');
+ws.on('open', () => {
+  ws.send(JSON.stringify({
+    type: 'auth',
+    token: 'the-token-from-dashboard',
+    agent_id: 'my-copilot'
+  }));
+});
+```
+
+For remote agents, use a tunnel (see [Remote Access](#remote-access-tunneling)) and connect via `wss://your-tunnel-url/`.
+
 ## WebSocket Protocol
 
 Connect to `ws://localhost:9333` (configurable).
