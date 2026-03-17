@@ -256,7 +256,7 @@ th{text-align:left;padding:10px 14px;background:#faf9f7;font-weight:600;position
 td{padding:8px 14px;border-top:1px solid #f0f0f0}
 tr.ok td{background:#f0fdf4}
 tr.fail td{background:#fef2f2}
-.hidden{display:none}
+.hidden{display:none !important}
 #auth-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000}
 #auth-modal .modal{background:#fff;border-radius:20px;padding:32px;max-width:400px;width:90%;text-align:center}
 #auth-modal input{width:100%;padding:12px;border:1.5px solid #ddd;border-radius:12px;margin:16px 0;font-size:16px;font-family:'DM Sans',sans-serif}
