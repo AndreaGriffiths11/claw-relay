@@ -133,6 +133,26 @@ export function startDashboard(
         return;
       }
 
+      // DELETE /api/audit — clear audit log
+      if (pathname === '/api/audit' && method === 'DELETE') {
+        const logFile = config.audit.logFile;
+        const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
+        try { fs.writeFileSync(absPath, '', 'utf-8'); } catch {}
+        json(res, 200, { ok: true });
+        return;
+      }
+
+      // GET /api/audit/download — download audit log as JSON
+      if (pathname === '/api/audit/download' && method === 'GET') {
+        const entries = readAuditLog(config);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Content-Disposition': 'attachment; filename="claw-relay-audit-' + new Date().toISOString().slice(0,10) + '.json"',
+        });
+        res.end(JSON.stringify(entries, null, 2));
+        return;
+      }
+
       // POST /api/agents
       if (pathname === '/api/agents' && method === 'POST') {
         try {
@@ -298,7 +318,13 @@ tr.fail td{background:#fef2f2}
     </div>
   </div>
   <div id="agents-grid" class="agent-grid"></div>
-  <h2 class="section-title">Audit Log</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 class="section-title" style="margin-bottom:0">Audit Log</h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="downloadAudit()">⬇ Download</button>
+      <button class="btn btn-red" onclick="clearAudit()">🗑 Clear</button>
+    </div>
+  </div>
   <div class="audit-wrap"><table><thead><tr><th>Time</th><th>Agent</th><th>Action</th><th>Target</th><th>Status</th><th>Duration</th></tr></thead><tbody id="audit-body"></tbody></table></div>
 </div>
 <div id="auth-modal" class="hidden">
@@ -425,6 +451,17 @@ async function deleteAgent(id) {
   if (!confirm('Delete agent ' + id + '?')) return;
   await api('/api/agents/' + encodeURIComponent(id), { method: 'DELETE' });
   refresh();
+}
+
+async function downloadAudit() {
+  const sep = '/api/audit/download'.includes('?') ? '&' : '?';
+  window.location.href = '/api/audit/download' + sep + 'token=' + encodeURIComponent(TOKEN);
+}
+
+async function clearAudit() {
+  if (!confirm('Clear all audit log entries? This cannot be undone.')) return;
+  await api('/api/audit', { method: 'DELETE' });
+  refreshAudit();
 }
 
 async function editAgent(id) {
