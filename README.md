@@ -2,7 +2,7 @@
   <img src="assets/logo.png" alt="Claw Relay" width="300">
 </p>
 
-<p align="center">A trust layer between AI agents and your real browser.</p>
+<p align="center"><strong>A trust layer between AI agents and your real browser.</strong></p>
 
 Agents connect via WebSocket → Claw Relay checks auth, permissions, and site access → then forwards actions to [agent-browser](https://github.com/vercel-labs/agent-browser), which controls Chrome via CDP.
 
