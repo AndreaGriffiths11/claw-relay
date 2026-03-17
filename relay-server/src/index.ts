@@ -1,15 +1,25 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'path';
-import { loadConfig, authenticate, AgentConfig } from './auth';
+import { loadConfig, reloadConfig, authenticate, AgentConfig } from './auth';
 import { parseMessage, isAuthMessage, isActionMessage, ActionMessage, OutgoingMessage } from './protocol';
 import { hasPermission } from './permissions';
 import { isAllowed } from './allowlist';
 import { RateLimiter } from './rate-limiter';
 import { AuditLogger } from './audit-logger';
 import { Engine } from './engine';
+import { agentConnected, agentDisconnected, agentAction, getState } from './state';
+import { startDashboard } from './dashboard';
 
 const configPath = process.argv[2] || path.join(__dirname, '..', 'config.example.yaml');
-const config = loadConfig(configPath);
+let config = loadConfig(configPath);
+
+export function reloadCurrentConfig(): void {
+  config = reloadConfig(configPath);
+}
+
+export function getConfigPath(): string {
+  return configPath;
+}
 const rateLimiter = new RateLimiter();
 const audit = new AuditLogger(config.audit.logFile, config.audit.logToStdout);
 const engine = new Engine(config.engine.binary, config.engine.timeout);
@@ -54,6 +64,7 @@ wss.on('connection', (ws: WebSocket) => {
       state.authenticated = true;
       state.agentId = msg.agent_id;
       state.agentConfig = agentConfig;
+      agentConnected(msg.agent_id);
       send(ws, { type: 'result', action: 'auth', ok: true });
       return;
     }
@@ -108,6 +119,7 @@ wss.on('connection', (ws: WebSocket) => {
     const duration = Date.now() - start;
 
     const target = actionMsg.ref || actionMsg.url || actionMsg.key || undefined;
+    agentAction(agentId, actionMsg.type);
     audit.log({ agent_id: agentId, action: actionMsg.type, target, ok: result.ok, duration_ms: duration, error: result.error });
 
     if (result.ok) {
@@ -120,9 +132,12 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('close', () => {
     const state = clients.get(ws);
     if (state?.agentId) {
+      agentDisconnected(state.agentId);
       console.log(`Agent ${state.agentId} disconnected`);
     }
   });
 });
 
 console.log(`Claw Relay server listening on ${config.server.host}:${config.server.port}`);
+
+startDashboard(config, getState, configPath, () => { reloadCurrentConfig(); });

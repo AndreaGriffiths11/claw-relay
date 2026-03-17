@@ -68,6 +68,7 @@ node dist/index.js config.yaml &
 RELAY_PID=$!
 sleep 1
 echo "  ✓ Relay running (PID $RELAY_PID)"
+echo "  Dashboard: http://localhost:9334"
 
 # Step 7: Optional tunnel
 case $TUNNEL in

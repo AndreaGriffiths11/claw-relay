@@ -27,3 +27,7 @@ audit:
 engine:
   binary: "agent-browser"
   timeout: 30000
+
+dashboard:
+  port: 9334
+  adminToken: "change-me"
