@@ -66,7 +66,7 @@ function parseBody(req: http.IncomingMessage): Promise<any> {
 }
 
 function json(res: http.ServerResponse, status: number, data: any): void {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
 
@@ -111,6 +111,10 @@ export function startDashboard(
     onConfigChange();
   };
 
+  if (!config.dashboard.adminToken) {
+    console.warn('Dashboard disabled: no adminToken configured');
+  }
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const pathname = url.pathname;
@@ -118,11 +122,7 @@ export function startDashboard(
 
     // CORS preflight
     if (method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      });
+      res.writeHead(204);
       res.end();
       return;
     }
@@ -130,6 +130,12 @@ export function startDashboard(
     // Health endpoint (no auth required)
     if (pathname === '/health' && method === 'GET') {
       json(res, 200, { status: 'ok', version: '0.1.0', uptime: process.uptime() });
+      return;
+    }
+
+    // If no admin token configured, disable all dashboard routes
+    if (!config.dashboard.adminToken) {
+      json(res, 403, { error: 'Dashboard disabled: no adminToken configured' });
       return;
     }
 
@@ -268,6 +274,7 @@ function getDashboardHTML(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
 <title>Claw Relay Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif&display=swap" rel="stylesheet">

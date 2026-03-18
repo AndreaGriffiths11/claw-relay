@@ -24,7 +24,7 @@ First message must be:
 | `select` | `interact` | `{"type": "select", "ref": "e7", "values": ["opt1"]}` |
 | `navigate` | `navigate` | `{"type": "navigate", "url": "https://..."}` |
 | `evaluate` | `execute` | `{"type": "evaluate", "js": "document.title"}` |
-| `close` | any | `{"type": "close"}` |
+| `close` | `navigate` | `{"type": "close"}` |
 
 ## Responses
 

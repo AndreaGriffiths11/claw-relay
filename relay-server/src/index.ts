@@ -33,6 +33,7 @@ interface ClientState {
 }
 
 const clients = new WeakMap<WebSocket, ClientState>();
+const connectedAgentIds = new Map<string, WebSocket>();
 
 function send(ws: WebSocket, msg: OutgoingMessage) {
   ws.send(JSON.stringify(msg));
@@ -61,9 +62,17 @@ wss.on('connection', (ws: WebSocket) => {
         ws.close();
         return;
       }
+      // Reject duplicate agent ID
+      if (connectedAgentIds.has(msg.agent_id)) {
+        console.warn(`Warning: Duplicate agent ID rejected: ${msg.agent_id}`);
+        send(ws, { type: 'error', code: 'duplicate_agent', message: 'Agent ID already connected' });
+        ws.close(4009, 'Agent ID already connected');
+        return;
+      }
       state.authenticated = true;
       state.agentId = msg.agent_id;
       state.agentConfig = agentConfig;
+      connectedAgentIds.set(msg.agent_id, ws);
       agentConnected(msg.agent_id);
       send(ws, { type: 'result', action: 'auth', ok: true });
       return;
@@ -132,6 +141,7 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('close', () => {
     const state = clients.get(ws);
     if (state?.agentId) {
+      connectedAgentIds.delete(state.agentId);
       agentDisconnected(state.agentId);
       console.log(`Agent ${state.agentId} disconnected`);
     }
@@ -139,5 +149,31 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 console.log(`Claw Relay server listening on ${config.server.host}:${config.server.port}`);
+
+// Graceful shutdown
+function gracefulShutdown() {
+  console.log('Shutting down gracefully...');
+  const closePromises: Promise<void>[] = [];
+  wss.clients.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      closePromises.push(new Promise<void>((resolve) => {
+        ws.once('close', resolve);
+        ws.close(1001, 'Going Away');
+      }));
+    }
+  });
+  const timeout = setTimeout(() => {
+    console.log('Shutdown timeout reached, forcing exit');
+    process.exit(0);
+  }, 3000);
+  Promise.all(closePromises).then(() => {
+    clearTimeout(timeout);
+    console.log('All clients disconnected cleanly');
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 startDashboard(config, getState, configPath, () => { reloadCurrentConfig(); });

@@ -37,8 +37,30 @@ fi
 
 # Step 4: Launch Chrome with remote debugging
 echo "🌐 Launching Chrome with remote debugging..."
-CHROME_APP="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CHROME_DATA="/tmp/claw-relay-chrome"
+
+# Find Chrome binary (support CHROME_PATH override)
+find_chrome() {
+  if [ -n "$CHROME_PATH" ]; then
+    if [ -x "$CHROME_PATH" ]; then echo "$CHROME_PATH"; return; fi
+    echo "✗ CHROME_PATH set but not executable: $CHROME_PATH" >&2; return 1
+  fi
+  # macOS
+  if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+    echo "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; return
+  fi
+  # Linux
+  for cmd in google-chrome google-chrome-stable chromium chromium-browser; do
+    if command -v "$cmd" >/dev/null 2>&1; then echo "$cmd"; return; fi
+  done
+  # WSL
+  if [ -x "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" ]; then
+    echo "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"; return
+  fi
+  return 1
+}
+
+CHROME_APP="$(find_chrome)" || { echo "✗ Chrome not found. Set CHROME_PATH environment variable."; exit 1; }
 
 # Check if Chrome is already running with debugging
 if curl -s http://localhost:9222/json/version >/dev/null 2>&1; then
