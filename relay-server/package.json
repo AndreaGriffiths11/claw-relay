@@ -2,19 +2,16 @@
   "name": "claw-relay-server",
   "version": "0.1.0",
   "description": "Trust layer between AI agents and agent-browser",
-  "main": "dist/index.js",
+  "main": "src/index.ts",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "npx ts-node src/index.ts"
+    "start": "bun src/index.ts",
+    "dev": "bun --watch src/index.ts"
   },
   "dependencies": {
-    "ws": "^8.19.0",
+    "hono": "^4.0.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/ws": "^8.5.10",
-    "typescript": "^5.3.3"
+    "@types/bun": "latest"
   }
 }

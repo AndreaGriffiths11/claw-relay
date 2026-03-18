@@ -1,4 +1,4 @@
-import * as http from 'http';
+import { Hono } from 'hono';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as YAML from 'yaml';
@@ -11,8 +11,8 @@ function getAdminToken(config: Config): string {
   return config.dashboard.adminToken;
 }
 
-function checkAuth(config: Config, req: http.IncomingMessage): boolean {
-  const authHeader = req.headers.authorization;
+function checkAuth(config: Config, req: Request): boolean {
+  const authHeader = req.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ') && authHeader.slice(7) === getAdminToken(config)) return true;
   return false;
 }
@@ -47,27 +47,6 @@ function writeConfigAtomic(configPath: string, config: Config): void {
   const tmp = configPath + '.tmp.' + Date.now();
   fs.writeFileSync(tmp, yamlStr, 'utf-8');
   fs.renameSync(tmp, configPath);
-}
-
-const MAX_BODY_SIZE = 1024 * 1024; // 1MB
-
-function parseBody(req: http.IncomingMessage): Promise<any> {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    let size = 0;
-    req.on('data', (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > MAX_BODY_SIZE) { req.destroy(); reject(new Error('Body too large')); return; }
-      body += chunk.toString();
-    });
-    req.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(new Error('Invalid JSON')); } });
-    req.on('error', reject);
-  });
-}
-
-function json(res: http.ServerResponse, status: number, data: any): void {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(data));
 }
 
 const VALID_SCOPES = ['navigate', 'read', 'interact', 'evaluate'];
@@ -115,157 +94,125 @@ export function startDashboard(
     console.warn('Dashboard disabled: no adminToken configured');
   }
 
-  const server = http.createServer(async (req, res) => {
-    const url = new URL(req.url || '/', `http://${req.headers.host}`);
-    const pathname = url.pathname;
-    const method = req.method || 'GET';
+  const app = new Hono();
 
-    // CORS preflight
-    if (method === 'OPTIONS') {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
+  // Health endpoint (no auth required)
+  app.get('/health', (c) => {
+    return c.json({ status: 'ok', version: '0.1.0', uptime: process.uptime() });
+  });
 
-    // Health endpoint (no auth required)
-    if (pathname === '/health' && method === 'GET') {
-      json(res, 200, { status: 'ok', version: '0.1.0', uptime: process.uptime() });
-      return;
-    }
-
-    // If no admin token configured, disable all dashboard routes
+  // Serve dashboard HTML
+  app.get('/', (c) => {
     if (!config.dashboard.adminToken) {
-      json(res, 403, { error: 'Dashboard disabled: no adminToken configured' });
-      return;
+      return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
     }
-
-    // Serve dashboard HTML
-    if (pathname === '/' && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(getDashboardHTML());
-      return;
-    }
-
-    // API routes require auth
-    if (pathname.startsWith('/api/')) {
-      if (!checkAuth(config, req)) {
-        json(res, 401, { error: 'Unauthorized' });
-        return;
-      }
-
-      // GET /api/config
-      if (pathname === '/api/config' && method === 'GET') {
-        const redacted: Record<string, any> = {};
-        for (const [id, agent] of Object.entries(config.agents)) {
-          redacted[id] = { ...agent, token: redactToken(agent.token) };
-        }
-        json(res, 200, { agents: redacted, server: config.server, dashboard: { port: config.dashboard.port } });
-        return;
-      }
-
-      // GET /api/status
-      if (pathname === '/api/status' && method === 'GET') {
-        const state = getState();
-        json(res, 200, state);
-        return;
-      }
-
-      // GET /api/audit
-      if (pathname === '/api/audit' && method === 'GET') {
-        const entries = readAuditLog(config);
-        json(res, 200, { entries });
-        return;
-      }
-
-      // DELETE /api/audit — clear audit log
-      if (pathname === '/api/audit' && method === 'DELETE') {
-        const logFile = config.audit.logFile;
-        const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
-        try { fs.writeFileSync(absPath, '', 'utf-8'); } catch {}
-        json(res, 200, { ok: true });
-        return;
-      }
-
-      // GET /api/audit/download — download audit log as JSON
-      if (pathname === '/api/audit/download' && method === 'GET') {
-        const entries = readAuditLog(config);
-        res.writeHead(200, {
-          'Content-Type': 'application/json',
-          'Content-Disposition': 'attachment; filename="claw-relay-audit-' + new Date().toISOString().slice(0,10) + '.json"',
-        });
-        res.end(JSON.stringify(entries, null, 2));
-        return;
-      }
-
-      // POST /api/agents
-      if (pathname === '/api/agents' && method === 'POST') {
-        try {
-          const body = await parseBody(req);
-          const { id, token, scopes, allowlist, rateLimit } = body;
-          const err = validateAgentFields(body, true);
-          if (err) { json(res, 400, { error: err }); return; }
-          if (config.agents[id]) { json(res, 409, { error: 'Agent already exists' }); return; }
-          config.agents[id] = {
-            token,
-            scopes: scopes || ['read'],
-            allowlist: allowlist || ['*'],
-            rateLimit: rateLimit || 30,
-          };
-          writeConfigAtomic(configPath, config);
-          reloadCfg();
-          json(res, 201, { ok: true });
-        } catch (e: any) {
-          const status = e.message === 'Body too large' ? 413 : 400;
-          json(res, status, { error: e.message });
-        }
-        return;
-      }
-
-      // PUT /api/agents/:id
-      const putMatch = pathname.match(/^\/api\/agents\/([^/]+)$/);
-      if (putMatch && method === 'PUT') {
-        const id = decodeURIComponent(putMatch[1]);
-        if (!config.agents[id]) { json(res, 404, { error: 'Agent not found' }); return; }
-        try {
-          const body = await parseBody(req);
-          const err = validateAgentFields(body, false);
-          if (err) { json(res, 400, { error: err }); return; }
-          if (body.scopes !== undefined) config.agents[id].scopes = body.scopes;
-          if (body.allowlist !== undefined) config.agents[id].allowlist = body.allowlist;
-          if (body.rateLimit !== undefined) config.agents[id].rateLimit = body.rateLimit;
-          if (body.token !== undefined) config.agents[id].token = body.token;
-          writeConfigAtomic(configPath, config);
-          reloadCfg();
-          json(res, 200, { ok: true });
-        } catch (e: any) {
-          const status = e.message === 'Body too large' ? 413 : 400;
-          json(res, status, { error: e.message });
-        }
-        return;
-      }
-
-      // DELETE /api/agents/:id
-      const delMatch = pathname.match(/^\/api\/agents\/([^/]+)$/);
-      if (delMatch && method === 'DELETE') {
-        const id = decodeURIComponent(delMatch[1]);
-        if (!config.agents[id]) { json(res, 404, { error: 'Agent not found' }); return; }
-        delete config.agents[id];
-        writeConfigAtomic(configPath, config);
-        reloadCfg();
-        json(res, 200, { ok: true });
-        return;
-      }
-
-      json(res, 404, { error: 'Not found' });
-      return;
-    }
-
-    json(res, 404, { error: 'Not found' });
+    return c.html(getDashboardHTML());
   });
 
-  server.listen(config.dashboard.port, () => {
-    console.log(`Dashboard running on http://localhost:${config.dashboard.port}`);
+  // Auth middleware for API routes
+  const requireAuth = (c: any, next: any) => {
+    if (!config.dashboard.adminToken) {
+      return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
+    }
+    if (!checkAuth(config, c.req.raw)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    return next();
+  };
+
+  // API routes
+  app.use('/api/*', requireAuth);
+
+  app.get('/api/config', (c) => {
+    const redacted: Record<string, any> = {};
+    for (const [id, agent] of Object.entries(config.agents)) {
+      redacted[id] = { ...agent, token: redactToken(agent.token) };
+    }
+    return c.json({ agents: redacted, server: config.server, dashboard: { port: config.dashboard.port } });
   });
+
+  app.get('/api/status', (c) => {
+    const state = getState();
+    return c.json(state);
+  });
+
+  app.get('/api/audit', (c) => {
+    const entries = readAuditLog(config);
+    return c.json({ entries });
+  });
+
+  app.delete('/api/audit', (c) => {
+    const logFile = config.audit.logFile;
+    const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
+    try { fs.writeFileSync(absPath, '', 'utf-8'); } catch {}
+    return c.json({ ok: true });
+  });
+
+  app.get('/api/audit/download', (c) => {
+    const entries = readAuditLog(config);
+    return new Response(JSON.stringify(entries, null, 2), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Disposition': 'attachment; filename="claw-relay-audit-' + new Date().toISOString().slice(0,10) + '.json"',
+      },
+    });
+  });
+
+  app.post('/api/agents', async (c) => {
+    try {
+      const body = await c.req.json();
+      const { id, token, scopes, allowlist, rateLimit } = body;
+      const err = validateAgentFields(body, true);
+      if (err) return c.json({ error: err }, 400);
+      if (config.agents[id]) return c.json({ error: 'Agent already exists' }, 409);
+      config.agents[id] = {
+        token,
+        scopes: scopes || ['read'],
+        allowlist: allowlist || ['*'],
+        rateLimit: rateLimit || 30,
+      };
+      writeConfigAtomic(configPath, config);
+      reloadCfg();
+      return c.json({ ok: true }, 201);
+    } catch (e: any) {
+      return c.json({ error: e.message }, 400);
+    }
+  });
+
+  app.put('/api/agents/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!config.agents[id]) return c.json({ error: 'Agent not found' }, 404);
+    try {
+      const body = await c.req.json();
+      const err = validateAgentFields(body, false);
+      if (err) return c.json({ error: err }, 400);
+      if (body.scopes !== undefined) config.agents[id].scopes = body.scopes;
+      if (body.allowlist !== undefined) config.agents[id].allowlist = body.allowlist;
+      if (body.rateLimit !== undefined) config.agents[id].rateLimit = body.rateLimit;
+      if (body.token !== undefined) config.agents[id].token = body.token;
+      writeConfigAtomic(configPath, config);
+      reloadCfg();
+      return c.json({ ok: true });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 400);
+    }
+  });
+
+  app.delete('/api/agents/:id', (c) => {
+    const id = c.req.param('id');
+    if (!config.agents[id]) return c.json({ error: 'Agent not found' }, 404);
+    delete config.agents[id];
+    writeConfigAtomic(configPath, config);
+    reloadCfg();
+    return c.json({ ok: true });
+  });
+
+  Bun.serve({
+    port: config.dashboard.port,
+    fetch: app.fetch,
+  });
+
+  console.log(`Dashboard running on http://localhost:${config.dashboard.port}`);
 }
 
 function getDashboardHTML(): string {

@@ -21,7 +21,7 @@ echo ""
 
 # Step 1: Check dependencies
 command -v agent-browser >/dev/null 2>&1 || { echo "✗ agent-browser not found. Run: npm install -g agent-browser"; exit 1; }
-command -v node >/dev/null 2>&1 || { echo "✗ node not found"; exit 1; }
+command -v bun >/dev/null 2>&1 || { echo "✗ bun not found. Install: curl -fsSL https://bun.sh/install | bash"; exit 1; }
 
 # Step 2: Check if config exists
 if [ ! -f "$RELAY_DIR/config.yaml" ]; then
@@ -29,10 +29,10 @@ if [ ! -f "$RELAY_DIR/config.yaml" ]; then
   exit 1
 fi
 
-# Step 3: Check if dist exists, build if not
-if [ ! -f "$RELAY_DIR/dist/index.js" ]; then
-  echo "⚙ Building relay server..."
-  cd "$RELAY_DIR" && npx tsc
+# Step 3: Install dependencies if needed
+if [ ! -d "$RELAY_DIR/node_modules" ]; then
+  echo "⚙ Installing dependencies..."
+  cd "$RELAY_DIR" && bun install
 fi
 
 # Step 4: Launch Chrome with remote debugging
@@ -86,7 +86,7 @@ echo "  ✓ Connected"
 # Step 6: Start relay server
 echo "📡 Starting relay server..."
 cd "$RELAY_DIR"
-node dist/index.js config.yaml &
+bun src/index.ts config.yaml &
 RELAY_PID=$!
 sleep 1
 echo "  ✓ Relay running (PID $RELAY_PID)"

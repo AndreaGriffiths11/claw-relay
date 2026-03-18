@@ -8,9 +8,18 @@ Agents connect via WebSocket → Claw Relay checks auth, permissions, and site a
 
 An AI agent can read pages, click buttons, fill forms, and navigate — on your actual browser, with your cookies and sessions — while you control exactly what it's allowed to touch.
 
+**Runtime:** [Bun](https://bun.sh) — no build step, runs TypeScript directly.
+
 ## Quick Start
 
 ```bash
+# Install Bun if you don't have it
+curl -fsSL https://bun.sh/install | bash
+
+# Install dependencies
+cd relay-server && bun install
+
+# Start everything
 ./start.sh                     # starts Chrome + relay + dashboard + tunnel
 ```
 
