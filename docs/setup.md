@@ -3,17 +3,19 @@
 ## Prerequisites
 
 ```bash
-npm install -g agent-browser    # browser automation engine
-brew install cloudflared        # only if you want remote access (optional)
+curl -fsSL https://bun.sh/install | bash   # install Bun runtime
+npm install -g agent-browser               # browser automation engine
+brew install cloudflared                   # only if you want remote access (optional)
 ```
 
-## 1. Build the Relay
+## 1. Install Dependencies
 
 ```bash
 cd relay-server
-npm install          # must be inside relay-server/, not the repo root
-npx tsc              # compiles TypeScript — required before first run
+bun install          # must be inside relay-server/, not the repo root
 ```
+
+> No build step needed — Bun runs TypeScript directly.
 
 ## 2. Configure
 
@@ -80,7 +82,7 @@ agent-browser connect http://localhost:9222
 ## 5. Start the Relay
 
 ```bash
-node dist/index.js config.yaml
+bun src/index.ts config.yaml
 ```
 
 You should see:
