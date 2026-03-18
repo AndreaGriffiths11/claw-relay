@@ -439,16 +439,16 @@ async function refresh() {
       const card = document.createElement('div');
       card.className = 'card agent-card';
       const statusEmoji = conn ? '🟢 Connected' : '⚪ Offline';
-      const scopePills = (agent.scopes||[]).map(s => '<span class="' + pillClass(s) + '">' + s + '</span>').join('');
-      const lastAct = conn && conn.lastAction ? conn.lastAction + ' (' + new Date(conn.lastActionAt).toLocaleTimeString() + ')' : '—';
-      card.innerHTML = '<div class="agent-id">' + id + '</div>' +
+      const scopePills = (agent.scopes||[]).map(s => '<span class="' + pillClass(s) + '">' + escapeHtml(s) + '</span>').join('');
+      const lastAct = conn && conn.lastAction ? escapeHtml(conn.lastAction) + ' (' + new Date(conn.lastActionAt).toLocaleTimeString() + ')' : '—';
+      card.innerHTML = '<div class="agent-id">' + escapeHtml(id) + '</div>' +
         '<div class="status">' + statusEmoji + '</div>' +
         '<div class="pills">' + scopePills + '</div>' +
-        '<div class="meta">Allowlist: ' + (agent.allowlist||[]).join(', ') + '</div>' +
-        '<div class="meta">Rate limit: ' + agent.rateLimit + '/min</div>' +
-        '<div class="meta token-row">Token: <span class="token-val">' + agent.token + '</span> <button class="btn btn-copy" onclick="copyToken(\\'' + id + '\\')">Copy</button></div>' +
+        '<div class="meta">Allowlist: ' + escapeHtml((agent.allowlist||[]).join(', ')) + '</div>' +
+        '<div class="meta">Rate limit: ' + escapeHtml(agent.rateLimit) + '/min</div>' +
+        '<div class="meta token-row">Token: <span class="token-val">' + escapeHtml(agent.token) + '</span></div>' +
         '<div class="meta">Last action: ' + lastAct + '</div>' +
-        '<div class="actions"><button class="btn btn-sm btn-outline" onclick="editAgent(\\'' + id + '\\')">Edit</button><button class="btn btn-sm btn-red" onclick="deleteAgent(\\'' + id + '\\')">Delete</button></div>';
+        '<div class="actions"><button class="btn btn-sm btn-outline" onclick="editAgent(\\'' + escapeHtml(id) + '\\')">Edit</button><button class="btn btn-sm btn-red" onclick="deleteAgent(\\'' + escapeHtml(id) + '\\')">Delete</button></div>';
       grid.appendChild(card);
     }
   } catch(e) { console.error(e); }
@@ -462,7 +462,7 @@ async function refreshAudit() {
     tbody.innerHTML = (data.entries||[]).reverse().map(e => {
       const cls = e.ok ? 'ok' : 'fail';
       const t = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '—';
-      return '<tr class="' + cls + '"><td>' + t + '</td><td>' + (e.agent_id||'—') + '</td><td>' + (e.action||'—') + '</td><td>' + (e.target||'—') + '</td><td>' + (e.ok ? '✓' : '✗') + '</td><td>' + (e.duration_ms != null ? e.duration_ms + 'ms' : '—') + '</td></tr>';
+      return '<tr class="' + cls + '"><td>' + t + '</td><td>' + escapeHtml(e.agent_id||'—') + '</td><td>' + escapeHtml(e.action||'—') + '</td><td>' + escapeHtml(e.target||'—') + '</td><td>' + (e.ok ? '✓' : '✗') + '</td><td>' + (e.duration_ms != null ? e.duration_ms + 'ms' : '—') + '</td></tr>';
     }).join('');
   } catch(e) {}
 }
@@ -491,7 +491,7 @@ async function addAgent() {
 
 function copyToken(id) {
   const agent = configData.agents?.[id];
-  if (agent?._fullToken) navigator.clipboard.writeText(agent._fullToken);
+  if (agent?.token) navigator.clipboard.writeText(agent.token);
 }
 
 async function deleteAgent(id) {
@@ -501,8 +501,14 @@ async function deleteAgent(id) {
 }
 
 async function downloadAudit() {
-  const sep = '/api/audit/download'.includes('?') ? '&' : '?';
-  window.location.href = '/api/audit/download' + sep + 'token=' + encodeURIComponent(TOKEN);
+  const resp = await fetch('/api/audit/download', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'claw-relay-audit-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function clearAudit() {
