@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Claw Relay Settings</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #faf9f7;
+      color: #1a1a1a;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      display: flex;
+      justify-content: center;
+      padding: 48px 16px;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    h1 span { color: #e53935; }
+    .subtitle {
+      color: #6b6b6b;
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      font-size: 13px;
+      color: #444;
+      margin-bottom: 5px;
+      margin-top: 18px;
+    }
+    label:first-of-type { margin-top: 0; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      background: #fff;
+      color: #1a1a1a;
+      transition: border-color 0.15s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #e53935;
+      box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
+    }
+    input::placeholder { color: #bbb; }
+    .hint {
+      font-size: 11px;
+      color: #999;
+      margin-top: 3px;
+    }
+    .actions {
+      margin-top: 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    button {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 8px;
+      background: #e53935;
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #c62828; }
+    #status {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #status.show { opacity: 1; }
+    #status.saved { color: #2e7d32; }
+    #status.error { color: #e53935; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🦞 Claw <span>Relay</span> Settings</h1>
+    <p class="subtitle">Configure your relay connection</p>
+
+    <label for="relayUrl">Relay URL</label>
+    <input type="text" id="relayUrl" placeholder="wss://relay.clawrelay.dev">
+    <div class="hint">Default: ws://localhost:9333</div>
+
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" placeholder="Your relay API key">
+    <div class="hint">Token for authenticating with the relay server</div>
+
+    <label for="agentId">Agent ID</label>
+    <input type="text" id="agentId" placeholder="my-agent">
+    <div class="hint">Default: my-agent</div>
+
+    <div class="actions">
+      <button id="saveBtn">Save</button>
+      <span id="status"></span>
+    </div>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>

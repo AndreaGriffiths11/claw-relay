@@ -109,6 +109,13 @@
     </div>
   </div>
 
+  <div class="status-section">
+    <div class="status-row">
+      <span class="status-label">Relay</span>
+      <span id="relayUrlDisplay" class="status-value" style="font-size:11px;color:#8b949e;word-break:break-all;">ws://localhost:9333</span>
+    </div>
+  </div>
+
   <div class="agent-info" id="agentSection">
     <div class="label">Connected Agent</div>
     <div class="agent-name" id="agentName">—</div>
@@ -124,6 +131,7 @@
 
   <div class="controls">
     <button class="toggle-btn" id="toggleBtn">Pause Relay</button>
+    <a href="#" id="settingsLink" style="display:block;text-align:center;margin-top:10px;color:#8b949e;font-size:12px;text-decoration:none;">⚙ Settings</a>
   </div>
 
   <script src="popup.js"></script>

@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Claw Relay",
-  "version": "0.2.0",
-  "description": "Status dashboard for Claw Relay \u2014 AI agent browser control",
+  "version": "0.3.0",
+  "description": "Status dashboard for Claw Relay — AI agent browser control",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
-    "http://localhost:9333/*"
+    "http://localhost:9333/*",
+    "https://*/*",
+    "http://*/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -20,6 +22,7 @@
   "background": {
     "service_worker": "background.js"
   },
+  "options_page": "options.html",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
