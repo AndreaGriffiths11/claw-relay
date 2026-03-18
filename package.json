@@ -1,0 +1,19 @@
+{
+  "name": "claw-relay",
+  "version": "0.1.0",
+  "description": "Give your AI agents a real browser. Open source relay between agents and Chrome.",
+  "main": "relay-server/dist/index.js",
+  "scripts": {
+    "build": "cd relay-server && npm run build",
+    "start": "cd relay-server && npm start",
+    "dev": "cd relay-server && npm run dev",
+    "install": "cd relay-server && npm install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndreaGriffiths11/claw-relay.git"
+  },
+  "keywords": ["ai", "agent", "browser", "relay", "chrome", "copilot", "automation"],
+  "author": "Andrea Griffiths",
+  "license": "MIT"
+}
