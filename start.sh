@@ -35,6 +35,13 @@ if [ ! -d "$RELAY_DIR/node_modules" ]; then
   cd "$RELAY_DIR" && bun install
 fi
 
+# Step 3.5: Build dashboard if not built
+if [ ! -d "$RELAY_DIR/dashboard/dist" ]; then
+  echo "🎨 Building dashboard..."
+  cd "$RELAY_DIR/dashboard" && bun install && bun run build
+  echo "  ✓ Dashboard built"
+fi
+
 # Step 4: Launch Chrome with remote debugging
 echo "🌐 Launching Chrome with remote debugging..."
 CHROME_DATA="/tmp/claw-relay-chrome"

@@ -77,6 +77,26 @@ function validateAgentFields(body: any, requireIdToken: boolean): string | null 
   return null;
 }
 
+// Resolve the dashboard dist directory
+const DASHBOARD_DIST = path.join(import.meta.dir, '..', 'dashboard', 'dist');
+
+function getMimeType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const types: Record<string, string> = {
+    '.html': 'text/html',
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+  };
+  return types[ext] || 'application/octet-stream';
+}
+
 export function startDashboard(
   initialConfig: Config,
   getState: GetStateFn,
@@ -99,14 +119,6 @@ export function startDashboard(
   // Health endpoint (no auth required)
   app.get('/health', (c) => {
     return c.json({ status: 'ok', version: '0.1.0', uptime: process.uptime() });
-  });
-
-  // Serve dashboard HTML
-  app.get('/', (c) => {
-    if (!config.dashboard.adminToken) {
-      return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
-    }
-    return c.html(getDashboardHTML());
   });
 
   // Auth middleware for API routes
@@ -207,287 +219,50 @@ export function startDashboard(
     return c.json({ ok: true });
   });
 
+  // Serve SPA static files
+  const hasDist = fs.existsSync(DASHBOARD_DIST);
+
+  if (hasDist) {
+    // Serve static assets from dist/assets/
+    app.get('/assets/*', (c) => {
+      const filePath = path.join(DASHBOARD_DIST, c.req.path);
+      try {
+        const file = Bun.file(filePath);
+        return new Response(file, {
+          headers: {
+            'Content-Type': getMimeType(filePath),
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        });
+      } catch {
+        return c.notFound();
+      }
+    });
+
+    // SPA fallback — serve index.html for all non-API routes
+    app.get('*', (c) => {
+      const indexPath = path.join(DASHBOARD_DIST, 'index.html');
+      try {
+        const file = Bun.file(indexPath);
+        return new Response(file, {
+          headers: { 'Content-Type': 'text/html' },
+        });
+      } catch {
+        return c.notFound();
+      }
+    });
+  } else {
+    app.get('*', (c) => {
+      return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#faf9f7">
+        <div style="text-align:center"><h1>🦞 Dashboard Not Built</h1><p style="color:#666;margin-top:8px">Run <code>cd relay-server/dashboard && bun run build</code> to build the dashboard.</p></div>
+      </body></html>`);
+    });
+  }
+
   Bun.serve({
     port: config.dashboard.port,
     fetch: app.fetch,
   });
 
   console.log(`Dashboard running on http://localhost:${config.dashboard.port}`);
-}
-
-function getDashboardHTML(): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="referrer" content="no-referrer">
-<title>Claw Relay Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:#faf9f7;color:#1a1a1a;min-height:100vh}
-h1,h2,h3{font-family:'Instrument Serif',serif;font-weight:400}
-.topbar{display:flex;justify-content:space-between;align-items:center;padding:20px 32px;background:#fff;border-bottom:1px solid #eee}
-.topbar h1{font-size:24px}
-.status-badge{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;color:#16a34a}
-.status-dot{width:10px;height:10px;border-radius:50%;background:#16a34a;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.container{max-width:1200px;margin:0 auto;padding:24px}
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px}
-.card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.06);transition:transform .2s,box-shadow .2s}
-.card:hover{transform:translateY(-3px);box-shadow:0 2px 8px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.1)}
-.stat-card{text-align:center}
-.stat-card .value{font-size:36px;font-weight:700;color:#e53935}
-.stat-card .label{font-size:14px;color:#666;margin-top:4px}
-.section-title{font-size:28px;margin-bottom:16px}
-.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px;margin-bottom:32px}
-.agent-card .agent-id{font-size:18px;font-weight:700;margin-bottom:8px}
-.agent-card .status{font-size:13px;margin-bottom:8px}
-.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
-.pill{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;color:#fff}
-.pill-read{background:#3b82f6}.pill-interact{background:#16a34a}.pill-navigate{background:#f97316}.pill-execute{background:#e53935}
-.meta{font-size:13px;color:#888;margin-bottom:4px}
-.token-row{display:flex;align-items:center;gap:8px}
-.token-val{font-family:monospace;font-size:13px;background:#f5f5f5;padding:2px 8px;border-radius:6px}
-.btn{padding:8px 16px;border-radius:12px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .15s}
-.btn-sm{padding:5px 12px;font-size:12px}
-.btn-red{background:#e53935;color:#fff}.btn-red:hover{background:#c62828}
-.btn-green{background:#16a34a;color:#fff}.btn-green:hover{background:#15803d}
-.btn-outline{background:transparent;border:1.5px solid #ddd;color:#1a1a1a}.btn-outline:hover{border-color:#e53935;color:#e53935}
-.btn-copy{background:#f0f0f0;color:#555;padding:4px 10px;font-size:11px;border-radius:8px}
-.actions{display:flex;gap:8px;margin-top:12px}
-#add-form-wrap{max-height:0;overflow:hidden;transition:max-height .3s;margin-bottom:24px}
-#add-form-wrap.open{max-height:600px}
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.form-grid label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
-.form-grid input,.form-grid textarea{width:100%;padding:10px;border:1.5px solid #ddd;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:14px}
-.form-grid textarea{resize:vertical;min-height:60px}
-.scopes-checks{display:flex;gap:16px;align-items:center;padding-top:8px}
-.scopes-checks label{font-weight:400;display:flex;align-items:center;gap:4px}
-.full-width{grid-column:1/-1}
-.audit-wrap{max-height:400px;overflow-y:auto;border-radius:16px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.06)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:10px 14px;background:#faf9f7;font-weight:600;position:sticky;top:0}
-td{padding:8px 14px;border-top:1px solid #f0f0f0}
-tr.ok td{background:#f0fdf4}
-tr.fail td{background:#fef2f2}
-.hidden{display:none !important}
-#auth-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000}
-#auth-modal .modal{background:#fff;border-radius:20px;padding:32px;max-width:400px;width:90%;text-align:center}
-#auth-modal input{width:100%;padding:12px;border:1.5px solid #ddd;border-radius:12px;margin:16px 0;font-size:16px;font-family:'DM Sans',sans-serif}
-</style>
-</head>
-<body>
-<div class="topbar">
-  <h1>🦞 Claw Relay Dashboard</h1>
-  <div class="status-badge"><div class="status-dot"></div> Running</div>
-</div>
-<div class="container">
-  <div class="stats-row">
-    <div class="card stat-card"><div class="value" id="stat-agents">—</div><div class="label">Connected Agents</div></div>
-    <div class="card stat-card"><div class="value" id="stat-actions">—</div><div class="label">Total Actions</div></div>
-    <div class="card stat-card"><div class="value" id="stat-uptime">—</div><div class="label">Uptime</div></div>
-  </div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <h2 class="section-title" style="margin-bottom:0">Agents</h2>
-    <button class="btn btn-green" onclick="toggleAddForm()">+ Add Agent</button>
-  </div>
-  <div id="add-form-wrap">
-    <div class="card">
-      <div class="form-grid">
-        <div><label>Agent ID</label><input id="f-id" placeholder="my-agent"></div>
-        <div><label>Token <button class="btn btn-copy" onclick="autoGenToken()">Auto-generate</button></label><input id="f-token" placeholder="secret-token"></div>
-        <div class="full-width"><label>Scopes</label><div class="scopes-checks">
-          <label><input type="checkbox" value="read" checked> read</label>
-          <label><input type="checkbox" value="interact"> interact</label>
-          <label><input type="checkbox" value="navigate"> navigate</label>
-          <label><input type="checkbox" value="execute"> execute</label>
-        </div></div>
-        <div><label>Allowlist (one per line)</label><textarea id="f-allowlist" placeholder="*">*</textarea></div>
-        <div><label>Rate Limit (req/min)</label><input id="f-rate" type="number" value="30"></div>
-        <div class="full-width" style="text-align:right;padding-top:8px">
-          <button class="btn btn-outline" onclick="toggleAddForm()">Cancel</button>
-          <button class="btn btn-green" onclick="addAgent()" style="margin-left:8px">Create Agent</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="agents-grid" class="agent-grid"></div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <h2 class="section-title" style="margin-bottom:0">Audit Log</h2>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-outline" onclick="downloadAudit()">⬇ Download</button>
-      <button class="btn btn-red" onclick="clearAudit()">🗑 Clear</button>
-    </div>
-  </div>
-  <div class="audit-wrap"><table><thead><tr><th>Time</th><th>Agent</th><th>Action</th><th>Target</th><th>Status</th><th>Duration</th></tr></thead><tbody id="audit-body"></tbody></table></div>
-</div>
-<div id="auth-modal" class="hidden">
-  <div class="modal">
-    <h2>🦞 Dashboard Auth</h2>
-    <p style="color:#666;margin-top:8px">Enter admin token to continue</p>
-    <input id="token-input" type="password" placeholder="Admin token">
-    <button class="btn btn-red" onclick="saveToken()" style="width:100%">Authenticate</button>
-  </div>
-</div>
-<script>
-let TOKEN = sessionStorage.getItem('claw-dashboard-token') || '';
-let configData = {};
-if (!TOKEN) document.getElementById('auth-modal').classList.remove('hidden');
-
-function escapeHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function saveToken() {
-  TOKEN = document.getElementById('token-input').value.trim();
-  if (!TOKEN) return;
-  sessionStorage.setItem('claw-dashboard-token', TOKEN);
-  api('/api/status').then(() => {
-    document.getElementById('auth-modal').classList.add('hidden');
-    refresh();
-  }).catch(() => {
-    TOKEN = '';
-    sessionStorage.removeItem('claw-dashboard-token');
-    alert('Invalid token');
-  });
-}
-
-function api(path, opts) {
-  const headers = Object.assign({}, opts?.headers || {}, { 'Authorization': 'Bearer ' + TOKEN });
-  return fetch(path, Object.assign({}, opts, { headers })).then(r => {
-    if (r.status === 401) { sessionStorage.removeItem('claw-dashboard-token'); document.getElementById('auth-modal').classList.remove('hidden'); throw new Error('Unauthorized'); }
-    return r.json();
-  });
-}
-
-function formatUptime(started) {
-  const ms = Date.now() - new Date(started).getTime();
-  const s = Math.floor(ms/1000), m = Math.floor(s/60), h = Math.floor(m/60), d = Math.floor(h/24);
-  if (d > 0) return d + 'd ' + (h%24) + 'h';
-  if (h > 0) return h + 'h ' + (m%60) + 'm';
-  return m + 'm ' + (s%60) + 's';
-}
-
-function pillClass(scope) {
-  return 'pill pill-' + scope;
-}
-
-async function refresh() {
-  if (!TOKEN) return;
-  try {
-    const [status, cfg] = await Promise.all([api('/api/status'), api('/api/config')]);
-    configData = cfg;
-    const connMap = {};
-    let totalActions = 0;
-    (status.connections||[]).forEach(c => { connMap[c.agentId] = c; totalActions += c.actionCount; });
-    document.getElementById('stat-agents').textContent = status.connections?.length || 0;
-    document.getElementById('stat-actions').textContent = totalActions;
-    document.getElementById('stat-uptime').textContent = formatUptime(status.startedAt);
-    const grid = document.getElementById('agents-grid');
-    grid.innerHTML = '';
-    for (const [id, agent] of Object.entries(cfg.agents)) {
-      const conn = connMap[id];
-      const card = document.createElement('div');
-      card.className = 'card agent-card';
-      const statusEmoji = conn ? '🟢 Connected' : '⚪ Offline';
-      const scopePills = (agent.scopes||[]).map(s => '<span class="' + pillClass(s) + '">' + escapeHtml(s) + '</span>').join('');
-      const lastAct = conn && conn.lastAction ? escapeHtml(conn.lastAction) + ' (' + new Date(conn.lastActionAt).toLocaleTimeString() + ')' : '—';
-      card.innerHTML = '<div class="agent-id">' + escapeHtml(id) + '</div>' +
-        '<div class="status">' + statusEmoji + '</div>' +
-        '<div class="pills">' + scopePills + '</div>' +
-        '<div class="meta">Allowlist: ' + escapeHtml((agent.allowlist||[]).join(', ')) + '</div>' +
-        '<div class="meta">Rate limit: ' + escapeHtml(agent.rateLimit) + '/min</div>' +
-        '<div class="meta token-row">Token: <span class="token-val">' + escapeHtml(agent.token) + '</span></div>' +
-        '<div class="meta">Last action: ' + lastAct + '</div>' +
-        '<div class="actions"><button class="btn btn-sm btn-outline" onclick="editAgent(\\'' + escapeHtml(id) + '\\')">Edit</button><button class="btn btn-sm btn-red" onclick="deleteAgent(\\'' + escapeHtml(id) + '\\')">Delete</button></div>';
-      grid.appendChild(card);
-    }
-  } catch(e) { console.error(e); }
-}
-
-async function refreshAudit() {
-  if (!TOKEN) return;
-  try {
-    const data = await api('/api/audit');
-    const tbody = document.getElementById('audit-body');
-    tbody.innerHTML = (data.entries||[]).reverse().map(e => {
-      const cls = e.ok ? 'ok' : 'fail';
-      const t = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '—';
-      return '<tr class="' + cls + '"><td>' + t + '</td><td>' + escapeHtml(e.agent_id||'—') + '</td><td>' + escapeHtml(e.action||'—') + '</td><td>' + escapeHtml(e.target||'—') + '</td><td>' + (e.ok ? '✓' : '✗') + '</td><td>' + (e.duration_ms != null ? e.duration_ms + 'ms' : '—') + '</td></tr>';
-    }).join('');
-  } catch(e) {}
-}
-
-function toggleAddForm() {
-  document.getElementById('add-form-wrap').classList.toggle('open');
-}
-
-function autoGenToken() {
-  const arr = new Uint8Array(24);
-  crypto.getRandomValues(arr);
-  document.getElementById('f-token').value = Array.from(arr, b => b.toString(16).padStart(2,'0')).join('');
-}
-
-async function addAgent() {
-  const id = document.getElementById('f-id').value.trim();
-  const token = document.getElementById('f-token').value.trim();
-  if (!id || !token) return alert('ID and token required');
-  const scopes = Array.from(document.querySelectorAll('.scopes-checks input:checked')).map(cb => cb.value);
-  const allowlist = document.getElementById('f-allowlist').value.trim().split('\\n').filter(Boolean);
-  const rateLimit = parseInt(document.getElementById('f-rate').value) || 30;
-  await api('/api/agents', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id,token,scopes,allowlist,rateLimit}) });
-  toggleAddForm();
-  refresh();
-}
-
-function copyToken(id) {
-  const agent = configData.agents?.[id];
-  if (agent?.token) navigator.clipboard.writeText(agent.token);
-}
-
-async function deleteAgent(id) {
-  if (!confirm('Delete agent ' + id + '?')) return;
-  await api('/api/agents/' + encodeURIComponent(id), { method: 'DELETE' });
-  refresh();
-}
-
-async function downloadAudit() {
-  const resp = await fetch('/api/audit/download', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
-  const blob = await resp.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'claw-relay-audit-' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-async function clearAudit() {
-  if (!confirm('Clear all audit log entries? This cannot be undone.')) return;
-  await api('/api/audit', { method: 'DELETE' });
-  refreshAudit();
-}
-
-async function editAgent(id) {
-  const agent = configData.agents?.[id];
-  if (!agent) return;
-  const newRate = prompt('Rate limit (current: ' + agent.rateLimit + '):', agent.rateLimit);
-  if (newRate === null) return;
-  await api('/api/agents/' + encodeURIComponent(id), {
-    method: 'PUT',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ rateLimit: parseInt(newRate) || agent.rateLimit })
-  });
-  refresh();
-}
-
-if (TOKEN) { refresh(); refreshAudit(); }
-setInterval(refresh, 5000);
-setInterval(refreshAudit, 10000);
-</script>
-</body>
-</html>`;
 }

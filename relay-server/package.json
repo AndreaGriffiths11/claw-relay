@@ -5,7 +5,9 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "bun src/index.ts",
-    "dev": "bun --watch src/index.ts"
+    "dev": "bun --watch src/index.ts",
+    "build:dashboard": "cd dashboard && bun install && bun run build",
+    "prebuild": "bun run build:dashboard"
   },
   "dependencies": {
     "hono": "^4.0.0",
