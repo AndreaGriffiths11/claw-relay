@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as crypto from 'node:crypto';
 import * as YAML from 'yaml';
 
 export interface AgentConfig {
@@ -19,7 +20,10 @@ export interface Config {
 
 export function authenticate(config: Config, token: string, agentId: string): AgentConfig | null {
   const agent = config.agents[agentId];
-  if (!agent || agent.token !== token) return null;
+  if (!agent) return null;
+  const a = crypto.createHash('sha256').update(agent.token).digest();
+  const b = crypto.createHash('sha256').update(token).digest();
+  if (!crypto.timingSafeEqual(a, b)) return null;
   return agent;
 }
 

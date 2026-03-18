@@ -40,11 +40,23 @@ export class Engine {
     });
   }
 
+  private cachedUrl: string | null = null;
+  private cachedUrlAt: number = 0;
+
   getCurrentUrl(): Promise<string | null> {
+    const now = Date.now();
+    if (this.cachedUrl !== null && now - this.cachedUrlAt < 2000) {
+      return Promise.resolve(this.cachedUrl);
+    }
     return new Promise((resolve) => {
       execFile(this.binary, ['get', 'url'], { timeout: 5000 }, (err, stdout) => {
-        if (err) resolve(null);
-        else resolve(stdout.trim());
+        if (err) {
+          resolve(null);
+        } else {
+          this.cachedUrl = stdout.trim();
+          this.cachedUrlAt = Date.now();
+          resolve(this.cachedUrl);
+        }
       });
     });
   }

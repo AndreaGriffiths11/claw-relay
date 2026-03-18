@@ -12,9 +12,6 @@ function getAdminToken(config: Config): string {
 }
 
 function checkAuth(config: Config, req: http.IncomingMessage): boolean {
-  const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  const tokenParam = url.searchParams.get('token');
-  if (tokenParam === getAdminToken(config)) return true;
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ') && authHeader.slice(7) === getAdminToken(config)) return true;
   return false;
@@ -52,10 +49,17 @@ function writeConfigAtomic(configPath: string, config: Config): void {
   fs.renameSync(tmp, configPath);
 }
 
+const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+
 function parseBody(req: http.IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_SIZE) { req.destroy(); reject(new Error('Body too large')); return; }
+      body += chunk.toString();
+    });
     req.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(new Error('Invalid JSON')); } });
     req.on('error', reject);
   });
@@ -64,6 +68,34 @@ function parseBody(req: http.IncomingMessage): Promise<any> {
 function json(res: http.ServerResponse, status: number, data: any): void {
   res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
   res.end(JSON.stringify(data));
+}
+
+const VALID_SCOPES = ['navigate', 'read', 'interact', 'evaluate'];
+const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function validateAgentFields(body: any, requireIdToken: boolean): string | null {
+  if (requireIdToken) {
+    if (typeof body.id !== 'string' || !AGENT_ID_RE.test(body.id))
+      return 'id must be alphanumeric/hyphens/underscores, 1-64 chars';
+    if (typeof body.token !== 'string' || body.token.length < 8)
+      return 'token must be a string of at least 8 characters';
+  } else {
+    if (body.token !== undefined && (typeof body.token !== 'string' || body.token.length < 8))
+      return 'token must be a string of at least 8 characters';
+  }
+  if (body.scopes !== undefined) {
+    if (!Array.isArray(body.scopes) || !body.scopes.every((s: any) => typeof s === 'string' && VALID_SCOPES.includes(s)))
+      return 'scopes must be an array of: ' + VALID_SCOPES.join(', ');
+  }
+  if (body.allowlist !== undefined) {
+    if (!Array.isArray(body.allowlist) || !body.allowlist.every((s: any) => typeof s === 'string'))
+      return 'allowlist must be an array of strings';
+  }
+  if (body.rateLimit !== undefined) {
+    if (typeof body.rateLimit !== 'number' || !Number.isInteger(body.rateLimit) || body.rateLimit <= 0)
+      return 'rateLimit must be a positive integer';
+  }
+  return null;
 }
 
 export function startDashboard(
@@ -95,6 +127,12 @@ export function startDashboard(
       return;
     }
 
+    // Health endpoint (no auth required)
+    if (pathname === '/health' && method === 'GET') {
+      json(res, 200, { status: 'ok', version: '0.1.0', uptime: process.uptime() });
+      return;
+    }
+
     // Serve dashboard HTML
     if (pathname === '/' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -113,7 +151,7 @@ export function startDashboard(
       if (pathname === '/api/config' && method === 'GET') {
         const redacted: Record<string, any> = {};
         for (const [id, agent] of Object.entries(config.agents)) {
-          redacted[id] = { ...agent, token: redactToken(agent.token), _fullToken: agent.token };
+          redacted[id] = { ...agent, token: redactToken(agent.token) };
         }
         json(res, 200, { agents: redacted, server: config.server, dashboard: { port: config.dashboard.port } });
         return;
@@ -158,7 +196,8 @@ export function startDashboard(
         try {
           const body = await parseBody(req);
           const { id, token, scopes, allowlist, rateLimit } = body;
-          if (!id || !token) { json(res, 400, { error: 'id and token required' }); return; }
+          const err = validateAgentFields(body, true);
+          if (err) { json(res, 400, { error: err }); return; }
           if (config.agents[id]) { json(res, 409, { error: 'Agent already exists' }); return; }
           config.agents[id] = {
             token,
@@ -170,7 +209,8 @@ export function startDashboard(
           reloadCfg();
           json(res, 201, { ok: true });
         } catch (e: any) {
-          json(res, 400, { error: e.message });
+          const status = e.message === 'Body too large' ? 413 : 400;
+          json(res, status, { error: e.message });
         }
         return;
       }
@@ -182,6 +222,8 @@ export function startDashboard(
         if (!config.agents[id]) { json(res, 404, { error: 'Agent not found' }); return; }
         try {
           const body = await parseBody(req);
+          const err = validateAgentFields(body, false);
+          if (err) { json(res, 400, { error: err }); return; }
           if (body.scopes !== undefined) config.agents[id].scopes = body.scopes;
           if (body.allowlist !== undefined) config.agents[id].allowlist = body.allowlist;
           if (body.rateLimit !== undefined) config.agents[id].rateLimit = body.rateLimit;
@@ -190,7 +232,8 @@ export function startDashboard(
           reloadCfg();
           json(res, 200, { ok: true });
         } catch (e: any) {
-          json(res, 400, { error: e.message });
+          const status = e.message === 'Body too large' ? 413 : 400;
+          json(res, status, { error: e.message });
         }
         return;
       }
@@ -336,28 +379,32 @@ tr.fail td{background:#fef2f2}
   </div>
 </div>
 <script>
-let TOKEN = localStorage.getItem('claw-dashboard-token') || '';
+let TOKEN = sessionStorage.getItem('claw-dashboard-token') || '';
 let configData = {};
 if (!TOKEN) document.getElementById('auth-modal').classList.remove('hidden');
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 function saveToken() {
   TOKEN = document.getElementById('token-input').value.trim();
   if (!TOKEN) return;
-  localStorage.setItem('claw-dashboard-token', TOKEN);
+  sessionStorage.setItem('claw-dashboard-token', TOKEN);
   api('/api/status').then(() => {
     document.getElementById('auth-modal').classList.add('hidden');
     refresh();
   }).catch(() => {
     TOKEN = '';
-    localStorage.removeItem('claw-dashboard-token');
+    sessionStorage.removeItem('claw-dashboard-token');
     alert('Invalid token');
   });
 }
 
 function api(path, opts) {
-  const sep = path.includes('?') ? '&' : '?';
-  return fetch(path + sep + 'token=' + encodeURIComponent(TOKEN), opts).then(r => {
-    if (r.status === 401) { localStorage.removeItem('claw-dashboard-token'); document.getElementById('auth-modal').classList.remove('hidden'); throw new Error('Unauthorized'); }
+  const headers = Object.assign({}, opts?.headers || {}, { 'Authorization': 'Bearer ' + TOKEN });
+  return fetch(path, Object.assign({}, opts, { headers })).then(r => {
+    if (r.status === 401) { sessionStorage.removeItem('claw-dashboard-token'); document.getElementById('auth-modal').classList.remove('hidden'); throw new Error('Unauthorized'); }
     return r.json();
   });
 }
