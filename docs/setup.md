@@ -3,7 +3,7 @@
 ## Prerequisites
 
 ```bash
-curl -fsSL https://bun.sh/install | bash   # install Bun runtime
+curl -fsSL https://bun.sh/install | bash   # install Bun runtime (or use Rust — see step 5)
 npm install -g agent-browser               # browser automation engine
 brew install cloudflared                   # only if you want remote access (optional)
 ```
@@ -81,8 +81,17 @@ agent-browser connect http://localhost:9222
 
 ## 5. Start the Relay
 
+**Bun (default):**
 ```bash
+cd relay-server
 bun src/index.ts config.yaml
+```
+
+**Rust (single binary, no runtime deps):**
+```bash
+cd relay-core
+cargo build --release
+./target/release/claw-relay-core ../relay-server/config.yaml
 ```
 
 You should see:
