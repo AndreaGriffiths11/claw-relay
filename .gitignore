@@ -4,3 +4,4 @@ audit.jsonl
 *.js.map
 config.yaml
 /tmp/
+relay-core/target/
