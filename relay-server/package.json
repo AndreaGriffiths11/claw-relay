@@ -10,7 +10,7 @@
     "prebuild": "bun run build:dashboard"
   },
   "dependencies": {
-    "hono": "^4.0.0",
+    "hono": "^4.12.8",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
