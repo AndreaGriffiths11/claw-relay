@@ -271,10 +271,19 @@ async fn get_config_handler(
 }
 
 pub fn create_router(state: Arc<AppState>) -> Router {
-    let dashboard_dist = std::path::PathBuf::from(&state.config_path)
+    // Look for dashboard dist relative to config file's directory,
+    // then try common locations
+    let config_dir = std::path::PathBuf::from(&state.config_path)
         .parent()
         .unwrap_or(std::path::Path::new("."))
-        .join("relay-server/dashboard/dist");
+        .to_path_buf();
+    let dashboard_dist = if config_dir.join("dashboard/dist").exists() {
+        config_dir.join("dashboard/dist")
+    } else if config_dir.join("../relay-server/dashboard/dist").exists() {
+        config_dir.join("../relay-server/dashboard/dist")
+    } else {
+        config_dir.join("dashboard/dist")
+    };
 
     let api = Router::new()
         .route("/health", get(health_handler))
