@@ -8,6 +8,10 @@ Agents connect via WebSocket → Claw Relay checks auth, permissions, and site a
 
 An AI agent can read pages, click buttons, fill forms, and navigate — on your actual browser, with your cookies and sessions — while you control exactly what it's allowed to touch.
 
+<p align="center">
+  <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
+</p>
+
 **Two implementations:** [Bun/TypeScript](relay-server/) (original) and [Rust](relay-core/) (drop-in replacement). Same config, same protocol, same API.
 
 ## Quick Start (Bun)
