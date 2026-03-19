@@ -104,6 +104,10 @@ case $TUNNEL in
   cloudflare)
     echo "☁️  Starting Cloudflare tunnel..."
     command -v cloudflared >/dev/null 2>&1 || { echo "  ✗ cloudflared not found. Run: brew install cloudflared"; exit 1; }
+    echo ""
+    echo "💡 If the tunnel fails or you need to restart it separately:"
+    echo "   cloudflared tunnel --url http://localhost:9333"
+    echo ""
     cloudflared tunnel --url http://localhost:9333 2>&1 | while IFS= read -r line; do
       if echo "$line" | grep -q "trycloudflare.com"; then
         URL=$(echo "$line" | grep -oE 'https://[^ ]+trycloudflare.com')
