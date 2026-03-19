@@ -81,6 +81,11 @@ export function Layout() {
       <div className="container">
         <Outlet />
       </div>
+      <footer className="footer">
+        <span>Built with 🦞 by <a href="https://ag11.dev" target="_blank" rel="noopener noreferrer">ag11.dev</a></span>
+        <span><a href="https://github.com/AndreaGriffiths11/claw-relay" target="_blank" rel="noopener noreferrer">GitHub</a></span>
+        <span><a href="https://clawrelay.dev" target="_blank" rel="noopener noreferrer">clawrelay.dev</a></span>
+      </footer>
     </>
   );
 }
