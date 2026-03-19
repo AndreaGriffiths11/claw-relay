@@ -108,20 +108,27 @@ case $TUNNEL in
     echo "💡 If the tunnel fails or you need to restart it separately:"
     echo "   cloudflared tunnel --url http://localhost:9333"
     echo ""
-    cloudflared tunnel --url http://localhost:9333 2>&1 | while IFS= read -r line; do
-      if echo "$line" | grep -q "trycloudflare.com"; then
-        URL=$(echo "$line" | grep -oE 'https://[^ ]+trycloudflare.com')
-        if [ -n "$URL" ]; then
-          echo ""
-          echo "🦞 ═══════════════════════════════════════════"
-          echo "   Claw Relay is live!"
-          echo "   Local:  ws://localhost:9333"
-          echo "   Remote: $URL"
-          echo "═══════════════════════════════════════════════"
-          echo ""
-        fi
-      fi
+    TUNNEL_LOG="/tmp/claw-relay-tunnel.log"
+    cloudflared tunnel --url http://localhost:9333 --no-autoupdate > "$TUNNEL_LOG" 2>&1 &
+    TUNNEL_PID=$!
+    # Wait for tunnel URL (up to 15 seconds)
+    URL=""
+    for i in $(seq 1 15); do
+      sleep 1
+      URL=$(grep -oE 'https://[^ ]+trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1)
+      if [ -n "$URL" ]; then break; fi
     done
+    if [ -n "$URL" ]; then
+      echo ""
+      echo "🦞 ═══════════════════════════════════════════"
+      echo "   Claw Relay is live!"
+      echo "   Local:  ws://localhost:9333"
+      echo "   Remote: $URL"
+      echo "═══════════════════════════════════════════════"
+      echo ""
+    else
+      echo "  ⚠ Tunnel started but URL not detected. Check: cat $TUNNEL_LOG"
+    fi
     ;;
   tailscale)
     echo "🔒 Starting Tailscale serve..."
