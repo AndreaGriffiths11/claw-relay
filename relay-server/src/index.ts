@@ -31,6 +31,21 @@ interface ClientState {
 
 const clients = new WeakMap<object, ClientState>();
 const connectedAgentIds = new Map<string, any>();
+const lastPong = new Map<string, number>();
+
+// Heartbeat: ping every 30s, kill stale connections after 90s
+const heartbeatInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [agentId, ws] of connectedAgentIds) {
+    const last = lastPong.get(agentId) || now;
+    if (now - last > 90000) {
+      console.warn(`Agent ${agentId} stale (no pong in 90s), disconnecting`);
+      ws.close(1001, 'Connection stale');
+      continue;
+    }
+    ws.send(JSON.stringify({ type: 'ping' }));
+  }
+}, 30000);
 
 function send(ws: any, msg: OutgoingMessage) {
   ws.send(JSON.stringify(msg));
@@ -41,6 +56,13 @@ async function handleMessage(ws: any, raw: string) {
   const msg = parseMessage(raw);
   if (!msg) {
     send(ws, { type: 'error', code: 'invalid_message', message: 'Could not parse message' });
+    return;
+  }
+
+  // Handle pong
+  if (msg.type === 'pong') {
+    const s = clients.get(ws);
+    if (s?.agentId) lastPong.set(s.agentId, Date.now());
     return;
   }
 
@@ -67,6 +89,7 @@ async function handleMessage(ws: any, raw: string) {
     state.agentId = msg.agent_id;
     state.agentConfig = agentConfig;
     connectedAgentIds.set(msg.agent_id, ws);
+    lastPong.set(msg.agent_id, Date.now());
     agentConnected(msg.agent_id);
     send(ws, { type: 'result', action: 'auth', ok: true });
     return;
@@ -155,6 +178,7 @@ const wsServer = Bun.serve({
       const state = clients.get(ws);
       if (state?.agentId) {
         connectedAgentIds.delete(state.agentId);
+        lastPong.delete(state.agentId);
         agentDisconnected(state.agentId);
         console.log(`Agent ${state.agentId} disconnected`);
       }
@@ -167,6 +191,7 @@ console.log(`Claw Relay server listening on ${config.server.host}:${config.serve
 // Graceful shutdown
 function gracefulShutdown() {
   console.log('Shutting down gracefully...');
+  clearInterval(heartbeatInterval);
   wsServer.stop();
   console.log('Server stopped');
   process.exit(0);

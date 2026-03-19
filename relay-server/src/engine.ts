@@ -32,7 +32,8 @@ export class Engine {
     return new Promise((resolve) => {
       execFile(this.binary, args, { timeout: this.timeout }, (err, stdout, stderr) => {
         if (err) {
-          resolve({ ok: false, error: stderr || err.message });
+          const errorMsg = stderr?.trim() || err.message || 'Unknown engine error';
+          resolve({ ok: false, error: errorMsg });
         } else {
           resolve({ ok: true, data: stdout.trim() || undefined });
         }
