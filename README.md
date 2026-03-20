@@ -12,22 +12,36 @@ An AI agent can read pages, click buttons, fill forms, and navigate — on your 
   <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
 </p>
 
-**Two implementations:** [Bun/TypeScript](relay-server/) (original) and [Rust](relay-core/) (drop-in replacement). Same config, same protocol, same API.
+## How It Works
 
-## Quick Start (Bun)
+Claw Relay has two pieces:
+
+1. **Relay server** — routes WebSocket traffic between agents and Chrome, enforces auth/permissions/allowlists
+2. **[agent-browser](https://github.com/vercel-labs/agent-browser)** — Rust CLI that controls Chrome via CDP
+
+The relay server has two implementations (same config, same protocol, pick one):
+- [Bun/TypeScript](relay-server/) — original, includes dashboard UI
+- [Rust](relay-core/) — drop-in replacement, single binary
+
+## Quick Start
+
+### 1. Install agent-browser
 
 ```bash
-# Install Bun if you don't have it
-curl -fsSL https://bun.sh/install | bash
-
-# Install dependencies
-cd relay-server && bun install
-
-# Start everything
-./start.sh                     # starts Chrome + relay + dashboard + tunnel
+cargo install agent-browser
 ```
 
-## Quick Start (Rust)
+### 2. Start the relay server
+
+**Option A: Bun (recommended — includes dashboard)**
+
+```bash
+curl -fsSL https://bun.sh/install | bash   # install Bun if needed
+cd relay-server && bun install
+./start.sh                                  # starts Chrome + relay + dashboard + tunnel
+```
+
+**Option B: Rust**
 
 ```bash
 cd relay-core
@@ -35,7 +49,9 @@ cargo build --release
 ./target/release/claw-relay-core ../relay-server/config.yaml
 ```
 
-Open `http://localhost:9334` for the dashboard. Add agents, set scopes, manage allowlists — all from the UI.
+### 3. Open the dashboard
+
+Go to `http://localhost:9334` — add agents, set scopes, manage allowlists.
 
 Or set up manually: **[Setup Guide →](docs/setup.md)**
 
