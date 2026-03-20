@@ -68,6 +68,10 @@ Optional status dashboard for your browser toolbar:
 2. Click "Load unpacked" → select `extension/`
 3. Click the icon to see connection status and recent actions
 
+## Powered By
+
+[OpenClaw](https://openclaw.ai) · [agent-browser](https://github.com/vercel-labs/agent-browser) · [Rust](https://www.rust-lang.org) · [Bun](https://bun.sh) · [Hono](https://hono.dev) · [TanStack](https://tanstack.com) · [Railway](https://railway.com) · [Cloudflare](https://cloudflare.com)
+
 ## License
 
 MIT
