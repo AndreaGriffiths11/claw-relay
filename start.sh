@@ -20,8 +20,22 @@ echo "🦞 Claw Relay Starting..."
 echo ""
 
 # Step 1: Check dependencies
-command -v agent-browser >/dev/null 2>&1 || { echo "✗ agent-browser not found. Run: npm install -g agent-browser"; exit 1; }
-command -v bun >/dev/null 2>&1 || { echo "✗ bun not found. Install: curl -fsSL https://bun.sh/install | bash"; exit 1; }
+if ! command -v agent-browser >/dev/null 2>&1; then
+  echo "⚙ agent-browser not found — installing via cargo..."
+  if command -v cargo >/dev/null 2>&1; then
+    cargo install agent-browser
+    echo "  ✓ agent-browser installed"
+  else
+    echo "✗ agent-browser requires Rust. Install Rust first: https://rustup.rs"
+    exit 1
+  fi
+fi
+if ! command -v bun >/dev/null 2>&1; then
+  echo "⚙ bun not found — installing..."
+  curl -fsSL https://bun.sh/install | bash
+  export PATH="$HOME/.bun/bin:$PATH"
+  echo "  ✓ bun installed"
+fi
 
 # Step 2: Check if config exists
 if [ ! -f "$RELAY_DIR/config.yaml" ]; then

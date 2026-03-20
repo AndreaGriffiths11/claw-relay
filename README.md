@@ -25,35 +25,18 @@ The relay server has two implementations (same config, same protocol, pick one):
 
 ## Quick Start
 
-### 1. Install agent-browser
-
 ```bash
-cargo install agent-browser
+git clone https://github.com/AndreaGriffiths11/claw-relay.git
+cd claw-relay
+cp relay-server/config.example.yaml relay-server/config.yaml
+./start.sh
 ```
 
-### 2. Start the relay server
+That's it. The startup script checks for dependencies (Bun, agent-browser) and installs them automatically if missing. It then launches Chrome, connects agent-browser, starts the relay server, and opens a Cloudflare tunnel.
 
-**Option A: Bun (recommended — includes dashboard)**
+Open `http://localhost:9334` for the dashboard — add agents, set scopes, manage allowlists.
 
-```bash
-curl -fsSL https://bun.sh/install | bash   # install Bun if needed
-cd relay-server && bun install
-./start.sh                                  # starts Chrome + relay + dashboard + tunnel
-```
-
-**Option B: Rust**
-
-```bash
-cd relay-core
-cargo build --release
-./target/release/claw-relay-core ../relay-server/config.yaml
-```
-
-### 3. Open the dashboard
-
-Go to `http://localhost:9334` — add agents, set scopes, manage allowlists.
-
-Or set up manually: **[Setup Guide →](docs/setup.md)**
+For manual setup or advanced options: **[Setup Guide →](docs/setup.md)**
 
 ## Security Model
 
