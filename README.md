@@ -12,32 +12,31 @@ An AI agent can read pages, click buttons, fill forms, and navigate — on your 
   <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
 </p>
 
-**Two implementations:** [Bun/TypeScript](relay-server/) (original) and [Rust](relay-core/) (drop-in replacement). Same config, same protocol, same API.
+## How It Works
 
-## Quick Start (Bun)
+Claw Relay has two pieces:
 
-```bash
-# Install Bun if you don't have it
-curl -fsSL https://bun.sh/install | bash
+1. **Relay server** — routes WebSocket traffic between agents and Chrome, enforces auth/permissions/allowlists
+2. **[agent-browser](https://github.com/vercel-labs/agent-browser)** — Rust CLI that controls Chrome via CDP
 
-# Install dependencies
-cd relay-server && bun install
+The relay server has two implementations (same config, same protocol, pick one):
+- [Bun/TypeScript](relay-server/) — original, includes dashboard UI
+- [Rust](relay-core/) — drop-in replacement, single binary
 
-# Start everything
-./start.sh                     # starts Chrome + relay + dashboard + tunnel
-```
-
-## Quick Start (Rust)
+## Quick Start
 
 ```bash
-cd relay-core
-cargo build --release
-./target/release/claw-relay-core ../relay-server/config.yaml
+git clone https://github.com/AndreaGriffiths11/claw-relay.git
+cd claw-relay
+cp relay-server/config.example.yaml relay-server/config.yaml
+./start.sh
 ```
 
-Open `http://localhost:9334` for the dashboard. Add agents, set scopes, manage allowlists — all from the UI.
+That's it. The startup script checks for dependencies (Bun, agent-browser) and installs them automatically if missing. It then launches Chrome, connects agent-browser, starts the relay server, and opens a Cloudflare tunnel.
 
-Or set up manually: **[Setup Guide →](docs/setup.md)**
+Open `http://localhost:9334` for the dashboard — add agents, set scopes, manage allowlists.
+
+For manual setup or advanced options: **[Setup Guide →](docs/setup.md)**
 
 ## Security Model
 
