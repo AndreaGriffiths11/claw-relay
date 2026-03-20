@@ -1,6 +1,6 @@
-# Claw Relay — Chrome Extension
+# Claw Relay — Browser Extension
 
-Manual installation guide (until we're on the Chrome Web Store).
+Works with **Chrome**, **Microsoft Edge**, and any Chromium-based browser. Manual installation guide (until we're on the stores).
 
 ## Download
 
@@ -14,7 +14,13 @@ git clone https://github.com/AndreaGriffiths11/claw-relay.git
 
 ## Install
 
-1. Open Chrome and go to `chrome://extensions`
+### Chrome
+1. Go to `chrome://extensions`
+
+### Microsoft Edge
+1. Go to `edge://extensions`
+
+### Then (both browsers):
 2. Toggle **Developer mode** ON (top-right corner)
 3. Click **Load unpacked**
 4. Select the `extension/` folder (the one containing `manifest.json`)
