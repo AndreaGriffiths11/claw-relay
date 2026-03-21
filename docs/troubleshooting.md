@@ -12,3 +12,7 @@
 | `agent-browser connect` errors | Make sure Chrome is running with `--remote-debugging-port=9222` |
 | `bun: command not found` | Install Bun: `curl -fsSL https://bun.sh/install \| bash` |
 | Dashboard auth modal won't dismiss | Clear localStorage for `localhost:9334` or open in incognito |
+| MCP server shows "Connection closed" in Copilot CLI | The relay WebSocket connection failed. Check that the relay is running and the URL/token are correct. Run the MCP server standalone to see the error: `CLAW_RELAY_URL=... CLAW_RELAY_TOKEN=... node mcp/claw-relay-mcp.js` |
+| MCP tools return "Not connected" | The WebSocket connection hasn't completed yet. The MCP server will auto-retry — wait a moment and try again |
+| `Duplicate agent ID rejected` | Another session is already connected with the same `agent_id`. Disconnect the other one or use a different agent ID |
+| Named tunnel returns 530 | The `cloudflared tunnel run` command isn't running. Start it: `cloudflared tunnel run --url http://localhost:9333 claw-relay` |
