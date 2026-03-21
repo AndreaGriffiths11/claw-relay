@@ -155,7 +155,28 @@ async function handleMessage(ws: any, raw: string) {
   audit.log({ agent_id: agentId, action: actionMsg.type, target, ok: result.ok, duration_ms: duration, error: result.error });
 
   if (result.ok) {
-    send(ws, { type: 'result', action: actionMsg.type, ok: true, data: result.data });
+    // For screenshots, tunnel the image data as base64
+    if (actionMsg.type === 'screenshot' && result.data) {
+      const screenshotPath = result.data.trim();
+      try {
+        const file = Bun.file(screenshotPath);
+        const buf = await file.arrayBuffer();
+        const base64 = Buffer.from(buf).toString('base64');
+        send(ws, {
+          type: 'result',
+          action: 'screenshot',
+          ok: true,
+          data: base64,
+          mimeType: 'image/png',
+          filePath: screenshotPath,
+        });
+      } catch (e: any) {
+        // Fall back to just the path if file read fails
+        send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data });
+      }
+    } else {
+      send(ws, { type: 'result', action: actionMsg.type, ok: true, data: result.data });
+    }
   } else {
     const errorMessage = result.error || 'Unknown error';
     send(ws, { type: 'error', code: 'engine_error', message: errorMessage });
