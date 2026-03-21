@@ -14,11 +14,13 @@ An AI agent can read pages, click buttons, fill forms, navigate, and **see the b
 
 ## Quick Start
 
-**As a Copilot CLI plugin:**
+**As a Copilot CLI / Claude Code plugin:**
 
 ```bash
 git clone https://github.com/AndreaGriffiths11/claw-relay.git
-copilot plugin install ./claw-relay
+copilot plugin install ./claw-relay    # Copilot CLI
+# or
+claude plugin install ./claw-relay     # Claude Code
 ```
 
 **Standalone:**
