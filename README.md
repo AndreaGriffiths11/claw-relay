@@ -12,17 +12,6 @@ An AI agent can read pages, click buttons, fill forms, navigate, and **see the b
   <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
 </p>
 
-## How It Works
-
-Claw Relay has two pieces:
-
-1. **Relay server** — routes WebSocket traffic between agents and Chrome, enforces auth/permissions/allowlists
-2. **[agent-browser](https://github.com/vercel-labs/agent-browser)** — Rust CLI that controls Chrome via CDP
-
-The relay server has two implementations (same config, same protocol, pick one):
-- [Bun/TypeScript](relay-server/) — original, includes dashboard UI
-- [Rust](relay-core/) — drop-in replacement, single binary
-
 ## Quick Start
 
 ```bash
@@ -32,127 +21,43 @@ cp relay-server/config.example.yaml relay-server/config.yaml
 ./start.sh
 ```
 
-That's it. The startup script checks for dependencies (Bun, agent-browser) and installs them automatically if missing. It then launches Chrome, connects agent-browser, starts the relay server, and opens a Cloudflare tunnel.
+The startup script installs dependencies, launches Chrome, starts the relay, and opens a tunnel. Dashboard at `http://localhost:9334`.
 
-Screenshots are tunneled as base64 data directly over the WebSocket — agents receive `{ data: "<base64>", mimeType: "image/png" }` in the response, so they can see the browser without needing filesystem access.
+## How It Works
 
-Open `http://localhost:9334` for the dashboard — add agents, set scopes, manage allowlists.
+1. **Relay server** — WebSocket hub that routes agent traffic to Chrome, enforces auth/permissions/allowlists
+2. **[agent-browser](https://github.com/vercel-labs/agent-browser)** — Rust CLI that controls Chrome via CDP
 
-For manual setup or advanced options: **[Setup Guide →](docs/setup.md)**
+Two server implementations (same config, same protocol):
+- [Bun/TypeScript](relay-server/) — original, includes dashboard
+- [Rust](relay-core/) — drop-in replacement, single binary
 
-## Security Model
+## Security
 
-- **Scopes** control what agents can do (`read`, `navigate`, `interact`, `execute`)
-- **Allowlists** control where agents can go (`github.com`, not `*`)
-- **Blocklist** always wins — blocked sites can't be reached by any agent
-- **Rate limiting** per agent
-- **Screenshot tunneling** — agents receive full-page screenshots as base64 PNG data over WebSocket, no file paths or local storage needed
-- **Audit log** records every action with timestamps
+- **Scopes** — what agents can do (`read`, `navigate`, `interact`, `execute`)
+- **Allowlists** — where agents can go (`github.com`, not `*`)
+- **Blocklist** — always wins, blocks override everything
+- **Rate limiting** — per agent
+- **Audit log** — every action timestamped
 
-Start with `read` scope only. Add more when you trust the setup.
+## Docs
 
-## Documentation
-
-| Doc | What's in it |
-|-----|-------------|
-| [Setup Guide](docs/setup.md) | Install, configure, launch — step by step |
-| [Dashboard](docs/dashboard.md) | Web UI for managing agents and viewing audit logs |
-| [Protocol](docs/protocol.md) | WebSocket API reference — auth, actions, responses, scopes |
+| | |
+|---|---|
+| [Setup Guide](docs/setup.md) | Install, configure, launch |
+| [MCP Server](docs/mcp.md) | Connect Copilot CLI, Claude Desktop, or any MCP client |
 | [Tunnels](docs/tunnels.md) | Remote access via Cloudflare, Tailscale, or ngrok |
-| [Agent Skill](SKILL.md) | Drop-in skill file for AI agents (OpenClaw, Copilot, Claude) |
+| [Protocol](docs/protocol.md) | WebSocket API reference |
+| [Dashboard](docs/dashboard.md) | Web UI for agents and audit logs |
+| [Agent Skill](SKILL.md) | Drop-in skill for AI agents |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
 
 ## Chrome Extension
 
-Optional status dashboard for your browser toolbar:
+Optional toolbar status dashboard:
 
-1. Open `chrome://extensions` → Enable "Developer mode"
-2. Click "Load unpacked" → select `extension/`
-3. Click the icon to see connection status and recent actions
-
-## Remote Access
-
-If your agent runs on a different machine, you need a tunnel. Two options:
-
-**Quick tunnel (temporary, changes every restart):**
-The `start.sh` script creates one automatically. Look for the URL in the output.
-
-**Named tunnel (permanent URL — recommended):**
-
-```bash
-cloudflared tunnel login
-cloudflared tunnel create claw-relay
-cloudflared tunnel route dns claw-relay relay.yourdomain.com
-cloudflared tunnel run --url http://localhost:9333 claw-relay
-```
-
-Your relay is now permanently available at `wss://relay.yourdomain.com/`. This URL never changes.
-
-If your agent is on the same machine as the relay, just use `ws://localhost:9333` — no tunnel needed.
-
-## MCP Server (Copilot / Any MCP Client)
-
-The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (GitHub Copilot CLI, Claude Desktop, etc.) to Claw Relay.
-
-### Setup
-
-```bash
-cd mcp && npm install
-```
-
-### Tools Exposed
-
-| Tool | Params | Description |
-|------|--------|-------------|
-| `browser_navigate` | `url` | Navigate to a URL |
-| `browser_click` | `ref` | Click element by ref |
-| `browser_type` | `ref`, `text` | Type text into element (appends) |
-| `browser_fill` | `ref`, `text` | Fill input (replaces content) |
-| `browser_press` | `key` | Press a key (Enter, Tab, etc.) |
-| `browser_snapshot` | — | Get accessibility tree |
-| `browser_screenshot` | — | Take a screenshot |
-
-### Usage with Copilot
-
-**Local agent (same machine as relay):**
-
-```bash
-copilot --additional-mcp-config '{"mcpServers":{"claw-relay":{"command":"node","args":["path/to/claw-relay/mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"ws://localhost:9333","CLAW_RELAY_AGENT":"copilot","CLAW_RELAY_TOKEN":"your-token"}}}}'
-```
-
-**Remote agent (different machine):**
-
-```bash
-copilot --additional-mcp-config '{"mcpServers":{"claw-relay":{"command":"node","args":["path/to/claw-relay/mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"wss://relay.yourdomain.com/","CLAW_RELAY_AGENT":"copilot","CLAW_RELAY_TOKEN":"your-token"}}}}'
-```
-
-Or in a config file (`~/.copilot/mcp-config.json`):
-
-```json
-{
-  "mcpServers": {
-    "claw-relay": {
-      "command": "node",
-      "args": ["path/to/claw-relay/mcp/claw-relay-mcp.js"],
-      "env": {
-        "CLAW_RELAY_URL": "ws://localhost:9333",
-        "CLAW_RELAY_TOKEN": "your-token",
-        "CLAW_RELAY_AGENT": "copilot"
-      }
-    }
-  }
-}
-```
-
-> For remote agents, replace `ws://localhost:9333` with your tunnel URL (e.g. `wss://relay.yourdomain.com/`). See [Remote Access](#remote-access) below.
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `CLAW_RELAY_URL` | Yes | WebSocket URL of the Claw Relay server |
-| `CLAW_RELAY_TOKEN` | Yes | Auth token matching relay config |
-| `CLAW_RELAY_AGENT` | No | Agent ID (default: `copilot`) |
+1. `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
+2. Click the icon for connection status and recent actions
 
 ## Powered By
 
