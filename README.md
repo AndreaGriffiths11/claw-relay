@@ -54,7 +54,7 @@ Two server implementations (same config, same protocol):
 
 ## Chrome Extension
 
-Optional toolbar status dashboard:
+Optional toolbar status dashboard. [Full install guide →](extension/README.md)
 
 1. `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
 2. Click the icon for connection status and recent actions

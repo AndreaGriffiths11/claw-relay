@@ -4,9 +4,11 @@
 
 ```bash
 curl -fsSL https://bun.sh/install | bash   # install Bun runtime (or use Rust — see step 5)
-npm install -g agent-browser               # browser automation engine
+cargo install agent-browser                # browser automation engine (Rust CLI)
 brew install cloudflared                   # only if you want remote access (optional)
 ```
+
+> **Note:** `start.sh` checks for these dependencies and installs them automatically if missing.
 
 ## 1. Install Dependencies
 

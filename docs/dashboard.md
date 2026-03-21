@@ -10,7 +10,7 @@ The dashboard runs on port `9334`:
 http://localhost:9334
 ```
 
-Pass the admin token via URL param (`?token=your-token`) or enter it in the auth modal.
+Enter your admin token in the auth modal when prompted.
 
 ## Build
 
