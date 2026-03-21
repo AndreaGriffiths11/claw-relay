@@ -1,0 +1,13 @@
+{
+  "name": "claw-relay",
+  "description": "Control a real browser from Copilot CLI — navigate, click, fill forms, take screenshots, all through your authenticated browser sessions",
+  "version": "1.0.0",
+  "author": {
+    "name": "Andrea Griffiths",
+    "email": "andreagriffiths11@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["browser", "automation", "chrome", "mcp", "relay", "screenshots"],
+  "skills": ["skills/"],
+  "mcpServers": ".mcp.json"
+}
