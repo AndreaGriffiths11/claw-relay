@@ -1,0 +1,11 @@
+{
+  "name": "claw-relay-mcp",
+  "version": "1.0.0",
+  "description": "MCP server bridge for Claw Relay — use browser automation from Copilot CLI or any MCP client",
+  "main": "claw-relay-mcp.js",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ws": "^8.18.0"
+  }
+}

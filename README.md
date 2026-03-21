@@ -70,6 +70,54 @@ Optional status dashboard for your browser toolbar:
 2. Click "Load unpacked" → select `extension/`
 3. Click the icon to see connection status and recent actions
 
+## MCP Server (Copilot CLI / Any MCP Client)
+
+The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (GitHub Copilot CLI, Claude Desktop, etc.) to Claw Relay.
+
+### Setup
+
+```bash
+cd mcp && npm install
+```
+
+### Tools Exposed
+
+| Tool | Params | Description |
+|------|--------|-------------|
+| `browser_navigate` | `url` | Navigate to a URL |
+| `browser_click` | `ref` | Click element by ref |
+| `browser_type` | `ref`, `text` | Type text into element (appends) |
+| `browser_fill` | `ref`, `text` | Fill input (replaces content) |
+| `browser_press` | `key` | Press a key (Enter, Tab, etc.) |
+| `browser_snapshot` | — | Get accessibility tree |
+| `browser_screenshot` | — | Take a screenshot |
+
+### Usage with Copilot CLI
+
+```bash
+copilot-cli --additional-mcp-config '{
+  "mcpServers": {
+    "claw-relay": {
+      "command": "node",
+      "args": ["path/to/claw-relay/mcp/claw-relay-mcp.js"],
+      "env": {
+        "CLAW_RELAY_URL": "wss://your-tunnel.trycloudflare.com/",
+        "CLAW_RELAY_TOKEN": "your-token",
+        "CLAW_RELAY_AGENT": "copilot"
+      }
+    }
+  }
+}'
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CLAW_RELAY_URL` | Yes | WebSocket URL of the Claw Relay server |
+| `CLAW_RELAY_TOKEN` | Yes | Auth token matching relay config |
+| `CLAW_RELAY_AGENT` | No | Agent ID (default: `copilot`) |
+
 ## Powered By
 
 [OpenClaw](https://openclaw.ai) · [agent-browser](https://github.com/vercel-labs/agent-browser) · [Rust](https://www.rust-lang.org) · [Bun](https://bun.sh) · [Hono](https://hono.dev) · [TanStack](https://tanstack.com) · [Railway](https://railway.com) · [Cloudflare](https://cloudflare.com)
