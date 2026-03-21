@@ -59,7 +59,7 @@ Start with `read` scope only. Add more when you trust the setup.
 | [Dashboard](docs/dashboard.md) | Web UI for managing agents and viewing audit logs |
 | [Protocol](docs/protocol.md) | WebSocket API reference — auth, actions, responses, scopes |
 | [Tunnels](docs/tunnels.md) | Remote access via Cloudflare, Tailscale, or ngrok |
-| [Agent Skill](SKILL.md) | Drop-in skill file for AI agents (OpenClaw, Copilot CLI, Claude) |
+| [Agent Skill](SKILL.md) | Drop-in skill file for AI agents (OpenClaw, Copilot, Claude) |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and fixes |
 
 ## Chrome Extension
@@ -70,7 +70,27 @@ Optional status dashboard for your browser toolbar:
 2. Click "Load unpacked" → select `extension/`
 3. Click the icon to see connection status and recent actions
 
-## MCP Server (Copilot CLI / Any MCP Client)
+## Remote Access
+
+If your agent runs on a different machine, you need a tunnel. Two options:
+
+**Quick tunnel (temporary, changes every restart):**
+The `start.sh` script creates one automatically. Look for the URL in the output.
+
+**Named tunnel (permanent URL — recommended):**
+
+```bash
+cloudflared tunnel login
+cloudflared tunnel create claw-relay
+cloudflared tunnel route dns claw-relay relay.yourdomain.com
+cloudflared tunnel run --url http://localhost:9333 claw-relay
+```
+
+Your relay is now permanently available at `wss://relay.yourdomain.com/`. This URL never changes.
+
+If your agent is on the same machine as the relay, just use `ws://localhost:9333` — no tunnel needed.
+
+## MCP Server (Copilot / Any MCP Client)
 
 The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (GitHub Copilot CLI, Claude Desktop, etc.) to Claw Relay.
 
@@ -92,13 +112,21 @@ cd mcp && npm install
 | `browser_snapshot` | — | Get accessibility tree |
 | `browser_screenshot` | — | Take a screenshot |
 
-### Usage with Copilot CLI
+### Usage with Copilot
+
+**Local agent (same machine as relay):**
 
 ```bash
-copilot-cli --additional-mcp-config '{"claw-relay":{"command":"node","args":["path/to/claw-relay/mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"wss://your-tunnel.trycloudflare.com/","CLAW_RELAY_AGENT":"copilot","CLAW_RELAY_TOKEN":"your-token"}}}'
+copilot --additional-mcp-config '{"mcpServers":{"claw-relay":{"command":"node","args":["path/to/claw-relay/mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"ws://localhost:9333","CLAW_RELAY_AGENT":"copilot","CLAW_RELAY_TOKEN":"your-token"}}}}'
 ```
 
-Or in a config file (`~/.config/github-copilot/mcp.json`):
+**Remote agent (different machine):**
+
+```bash
+copilot --additional-mcp-config '{"mcpServers":{"claw-relay":{"command":"node","args":["path/to/claw-relay/mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"wss://relay.yourdomain.com/","CLAW_RELAY_AGENT":"copilot","CLAW_RELAY_TOKEN":"your-token"}}}}'
+```
+
+Or in a config file (`~/.copilot/mcp-config.json`):
 
 ```json
 {
@@ -107,7 +135,7 @@ Or in a config file (`~/.config/github-copilot/mcp.json`):
       "command": "node",
       "args": ["path/to/claw-relay/mcp/claw-relay-mcp.js"],
       "env": {
-        "CLAW_RELAY_URL": "wss://your-tunnel.trycloudflare.com/",
+        "CLAW_RELAY_URL": "ws://localhost:9333",
         "CLAW_RELAY_TOKEN": "your-token",
         "CLAW_RELAY_AGENT": "copilot"
       }
@@ -115,6 +143,8 @@ Or in a config file (`~/.config/github-copilot/mcp.json`):
   }
 }
 ```
+
+> For remote agents, replace `ws://localhost:9333` with your tunnel URL (e.g. `wss://relay.yourdomain.com/`). See [Remote Access](#remote-access) below.
 
 ### Environment Variables
 
