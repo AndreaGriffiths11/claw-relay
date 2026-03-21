@@ -107,17 +107,18 @@ async function handleMessage(ws: any, raw: string) {
   const actionMsg = msg as ActionMessage;
   const agentId = state.agentId!;
   const agentCfg = state.agentConfig!;
+  const reqId = actionMsg.request_id;
 
   // Permission check
   if (!hasPermission(agentCfg.scopes, actionMsg.type)) {
-    send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks required scope for '${actionMsg.type}'` });
+    send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks required scope for '${actionMsg.type}'`, request_id: reqId });
     audit.log({ agent_id: agentId, action: actionMsg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
     return;
   }
 
   // Rate limit check
   if (!rateLimiter.check(agentId, agentCfg.rateLimit)) {
-    send(ws, { type: 'error', code: 'rate_limited', message: 'Rate limit exceeded' });
+    send(ws, { type: 'error', code: 'rate_limited', message: 'Rate limit exceeded', request_id: reqId });
     audit.log({ agent_id: agentId, action: actionMsg.type, ok: false, duration_ms: 0, error: 'rate_limited' });
     return;
   }
@@ -127,7 +128,7 @@ async function handleMessage(ws: any, raw: string) {
     const check = isAllowed(actionMsg.url, agentCfg.allowlist, config.blocklist);
     if (!check.allowed) {
       const reason = check.reason || 'Site blocked';
-      send(ws, { type: 'error', code: 'site_blocked', message: reason });
+      send(ws, { type: 'error', code: 'site_blocked', message: reason, request_id: reqId });
       audit.log({ agent_id: agentId, action: actionMsg.type, target: actionMsg.url, ok: false, duration_ms: 0, error: 'site_blocked' });
       return;
     }
@@ -137,7 +138,7 @@ async function handleMessage(ws: any, raw: string) {
       const check = isAllowed(currentUrl, agentCfg.allowlist, config.blocklist);
       if (!check.allowed) {
         const reason = check.reason || 'Current site blocked';
-        send(ws, { type: 'error', code: 'site_blocked', message: reason });
+        send(ws, { type: 'error', code: 'site_blocked', message: reason, request_id: reqId });
         audit.log({ agent_id: agentId, action: actionMsg.type, target: currentUrl, ok: false, duration_ms: 0, error: 'site_blocked' });
         return;
       }
@@ -171,18 +172,19 @@ async function handleMessage(ws: any, raw: string) {
           data: base64,
           mimeType: 'image/png',
           filePath: screenshotPath,
+          request_id: reqId,
         });
       } catch (e: any) {
         // Fall back to just the path if file read fails
         console.error(`Screenshot tunnel error: ${e.message} (path: ${screenshotPath})`);
-        send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data });
+        send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, request_id: reqId });
       }
     } else {
-      send(ws, { type: 'result', action: actionMsg.type, ok: true, data: result.data });
+      send(ws, { type: 'result', action: actionMsg.type, ok: true, data: result.data, request_id: reqId });
     }
   } else {
     const errorMessage = result.error || 'Unknown error';
-    send(ws, { type: 'error', code: 'engine_error', message: errorMessage });
+    send(ws, { type: 'error', code: 'engine_error', message: errorMessage, request_id: reqId });
   }
 }
 

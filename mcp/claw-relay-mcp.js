@@ -64,12 +64,15 @@ function connect() {
         return;
       }
 
-      // Route result/error to the single pending request
-      // The relay protocol doesn't use request IDs, so we resolve the oldest pending
+      // Route result/error to the matching request by ID
       if (msg.type === "result" || msg.type === "error") {
-        const first = pending.entries().next().value;
-        if (first) {
-          const [id, { resolve, reject, timer }] = first;
+        const reqId = msg.request_id;
+        const entry = reqId ? pending.get(reqId) : undefined;
+        // Fallback to FIFO if no request_id (backwards compat)
+        const fallback = !entry ? pending.entries().next().value : undefined;
+        const matched = entry ? [reqId, entry] : fallback;
+        if (matched) {
+          const [id, { resolve, reject, timer }] = matched;
           clearTimeout(timer);
           pending.delete(id);
           if (msg.type === "error") {
@@ -122,12 +125,13 @@ function sendAction(action) {
       return;
     }
     const id = ++requestId;
+    const reqIdStr = `mcp-${id}`;
     const timer = setTimeout(() => {
-      pending.delete(id);
+      pending.delete(reqIdStr);
       reject(new Error("Timeout waiting for relay response (30s)"));
     }, 30000);
-    pending.set(id, { resolve, reject, timer });
-    sendRaw(action);
+    pending.set(reqIdStr, { resolve, reject, timer });
+    sendRaw({ ...action, request_id: reqIdStr });
   });
 }
 

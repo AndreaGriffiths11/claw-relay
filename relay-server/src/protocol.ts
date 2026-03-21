@@ -14,6 +14,7 @@ export interface ActionMessage {
   js?: string;
   key?: string;
   values?: string[];
+  request_id?: string;
 }
 
 export interface ResultMessage {
@@ -21,12 +22,14 @@ export interface ResultMessage {
   action: string;
   ok: boolean;
   data?: string;
+  request_id?: string;
 }
 
 export interface ErrorMessage {
   type: 'error';
   code: string;
   message: string;
+  request_id?: string;
 }
 
 export type IncomingMessage = AuthMessage | ActionMessage | { type: 'pong' };
