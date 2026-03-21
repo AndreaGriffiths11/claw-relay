@@ -1,6 +1,12 @@
 # Claw Relay — Browser Extension
 
-Works with **Chrome**, **Microsoft Edge**, and any Chromium-based browser. Manual installation guide (until we're on the stores).
+Status dashboard for your browser toolbar. Shows connection status, recent agent actions, and relay health.
+
+> **Chrome Web Store submission is pending review.** In the meantime, you can install manually (see below).
+
+The extension is primarily designed for [Claw Relay Cloud](https://clawrelay.dev) users — it connects to your cloud relay and shows agent activity in real time. It also works with self-hosted relays.
+
+Works with **Chrome**, **Microsoft Edge**, and any Chromium-based browser.
 
 ## Download
 
