@@ -157,7 +157,9 @@ async function handleMessage(ws: any, raw: string) {
   if (result.ok) {
     // For screenshots, tunnel the image data as base64
     if (actionMsg.type === 'screenshot' && result.data) {
-      const screenshotPath = result.data.trim();
+      // Extract file path from agent-browser output (e.g. "✓ Screenshot saved to /path/to/file.png")
+      const pathMatch = result.data.match(/\/\S+\.png/);
+      const screenshotPath = pathMatch ? pathMatch[0] : result.data.trim();
       try {
         const file = Bun.file(screenshotPath);
         const buf = await file.arrayBuffer();
@@ -172,6 +174,7 @@ async function handleMessage(ws: any, raw: string) {
         });
       } catch (e: any) {
         // Fall back to just the path if file read fails
+        console.error(`Screenshot tunnel error: ${e.message} (path: ${screenshotPath})`);
         send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data });
       }
     } else {
