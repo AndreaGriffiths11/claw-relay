@@ -60,7 +60,7 @@ function writeConfigAtomic(configPath: string, config: Config): void {
   fs.renameSync(tmp, configPath);
 }
 
-const VALID_SCOPES = ['navigate', 'read', 'interact', 'evaluate'];
+const VALID_SCOPES = ['navigate', 'read', 'interact', 'execute'];
 const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 function validateAgentFields(body: any, requireIdToken: boolean): string | null {

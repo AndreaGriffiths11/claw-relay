@@ -13,6 +13,11 @@ const RELAY_TOKEN = process.env.CLAW_RELAY_TOKEN;
 const RELAY_AGENT = process.env.CLAW_RELAY_AGENT || "copilot";
 
 if (!RELAY_URL || !RELAY_TOKEN) {
+  const msg = "Error: Missing required environment variables.\n" +
+    "Please set CLAW_RELAY_URL and CLAW_RELAY_TOKEN before running.\n" +
+    "Example:\n" +
+    '  CLAW_RELAY_URL=ws://localhost:9333 CLAW_RELAY_TOKEN=your-token node mcp/claw-relay-mcp.js\n';
+  console.log(msg);
   console.error("Missing CLAW_RELAY_URL or CLAW_RELAY_TOKEN env vars");
   process.exit(1);
 }
@@ -23,6 +28,8 @@ let requestId = 0;
 const pending = new Map(); // id -> { resolve, reject, timer }
 let authenticated = false;
 let authPromise;
+let reconnectDelay = 1000;
+const MAX_RECONNECT_DELAY = 30000;
 
 let connectPromise;
 
@@ -57,6 +64,7 @@ function connect() {
       if (msg.type === "result" && msg.action === "auth") {
         if (msg.ok) {
           authenticated = true;
+          reconnectDelay = 1000;
           resolveConn();
         } else {
           rejectConn(new Error("Auth failed"));
@@ -96,10 +104,11 @@ function connect() {
         reject(new Error(`WebSocket closed (${code})`));
       }
       pending.clear();
-      // Auto-reconnect after 3 seconds (unless auth failed)
+      // Auto-reconnect with exponential backoff (unless auth failed)
       if (code !== 4001) {
-        console.error(`Relay connection lost (code ${code}). Reconnecting in 3s...`);
-        setTimeout(() => connect(), 3000);
+        console.error(`Relay connection lost (code ${code}). Reconnecting in ${reconnectDelay / 1000}s...`);
+        setTimeout(() => connect(), reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
       }
     });
   });
@@ -192,8 +201,8 @@ server.tool("browser_select", "Select an option from a dropdown by ref and value
   return { content: [{ type: "text", text: result.data || "Selected" }] };
 });
 
-server.tool("browser_evaluate", "Run JavaScript in the browser page", { script: z.string() }, async ({ script }) => {
-  const result = await sendAction({ type: "evaluate", script });
+server.tool("browser_evaluate", "Run JavaScript in the browser page", { js: z.string() }, async ({ js }) => {
+  const result = await sendAction({ type: "evaluate", js });
   return { content: [{ type: "text", text: result.data || "Evaluated" }] };
 });
 

@@ -21,8 +21,12 @@ export interface Config {
 export function authenticate(config: Config, token: string, agentId: string): AgentConfig | null {
   const agent = config.agents[agentId];
   if (!agent) return null;
-  const storedTokenHash = crypto.createHash('sha256').update(agent.token).digest();
-  const providedTokenHash = crypto.createHash('sha256').update(token).digest();
+  const storedHash = crypto.createHash('sha256');
+  storedHash.update(agent.token);
+  const storedTokenHash = storedHash.digest();
+  const providedHash = crypto.createHash('sha256');
+  providedHash.update(token);
+  const providedTokenHash = providedHash.digest();
   const tokensMatch = crypto.timingSafeEqual(storedTokenHash, providedTokenHash);
   if (!tokensMatch) return null;
   return agent;

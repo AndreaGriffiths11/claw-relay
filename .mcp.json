@@ -6,7 +6,7 @@
       "env": {
         "CLAW_RELAY_URL": "ws://localhost:9333",
         "CLAW_RELAY_AGENT": "copilot",
-        "CLAW_RELAY_TOKEN": ""
+        "CLAW_RELAY_TOKEN": "YOUR_TOKEN_HERE"
       }
     }
   }

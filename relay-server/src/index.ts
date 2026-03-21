@@ -171,7 +171,6 @@ async function handleMessage(ws: any, raw: string) {
           ok: true,
           data: base64,
           mimeType: 'image/png',
-          filePath: screenshotPath,
           request_id: reqId,
         });
       } catch (e: any) {
