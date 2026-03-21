@@ -12,6 +12,8 @@ First message must be:
 
 ## Actions
 
+All actions accept an optional `request_id` field. If provided, the relay echoes it back in the response — use this to match responses to requests when sending concurrent actions.
+
 | Action | Scope | Example |
 |--------|-------|---------|
 | `snapshot` | `read` | `{"type": "snapshot"}` |
@@ -30,7 +32,7 @@ First message must be:
 
 Success:
 ```json
-{"type": "result", "action": "snapshot", "ok": true, "data": "...accessibility tree..."}
+{"type": "result", "action": "snapshot", "ok": true, "data": "...accessibility tree...", "request_id": "mcp-1"}
 ```
 
 Screenshot (base64 tunneling):
@@ -42,9 +44,11 @@ The `screenshot` action returns the full-page image as base64-encoded PNG data d
 
 Error:
 ```json
-{"type": "error", "code": "permission_denied", "message": "Agent lacks 'interact' scope"}
+{"type": "error", "code": "permission_denied", "message": "Agent lacks 'interact' scope", "request_id": "mcp-1"}
 {"type": "error", "code": "site_blocked", "message": "mail.google.com is blocked"}
 ```
+
+The `request_id` field is optional. If omitted from the request, it won't appear in the response.
 
 ## Scopes
 
