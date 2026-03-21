@@ -24,8 +24,10 @@ const pending = new Map(); // id -> { resolve, reject, timer }
 let authenticated = false;
 let authPromise;
 
+let connectPromise;
+
 function connect() {
-  return new Promise((resolveConn, rejectConn) => {
+  connectPromise = new Promise((resolveConn, rejectConn) => {
     ws = new WebSocket(RELAY_URL);
 
     ws.on("open", () => {
@@ -100,7 +102,16 @@ function sendRaw(msg) {
 }
 
 function sendAction(action) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    // Wait for connection if still pending
+    if (!authenticated && connectPromise) {
+      try {
+        await connectPromise;
+      } catch (err) {
+        reject(new Error("Not connected to Claw Relay"));
+        return;
+      }
+    }
     if (!authenticated) {
       reject(new Error("Not authenticated to Claw Relay"));
       return;
@@ -168,10 +179,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // Then connect to the relay in the background
-  connect().catch((err) => {
-    console.error("Relay connection failed:", err.message);
-    process.exit(1);
-  });
+  connect();
 }
 
 main().catch((err) => {
