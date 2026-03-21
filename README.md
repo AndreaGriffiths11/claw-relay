@@ -95,7 +95,13 @@ cd mcp && npm install
 ### Usage with Copilot CLI
 
 ```bash
-copilot-cli --additional-mcp-config '{
+copilot-cli --additional-mcp-config '{"claw-relay":{"command":"node","args":["path/to/claw-relay/mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"wss://your-tunnel.trycloudflare.com/","CLAW_RELAY_AGENT":"copilot","CLAW_RELAY_TOKEN":"your-token"}}}'
+```
+
+Or in a config file (`~/.config/github-copilot/mcp.json`):
+
+```json
+{
   "mcpServers": {
     "claw-relay": {
       "command": "node",
@@ -107,7 +113,7 @@ copilot-cli --additional-mcp-config '{
       }
     }
   }
-}'
+}
 ```
 
 ### Environment Variables
