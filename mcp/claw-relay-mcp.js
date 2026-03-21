@@ -93,6 +93,11 @@ function connect() {
         reject(new Error(`WebSocket closed (${code})`));
       }
       pending.clear();
+      // Auto-reconnect after 3 seconds (unless auth failed)
+      if (code !== 4001) {
+        console.error(`Relay connection lost (code ${code}). Reconnecting in 3s...`);
+        setTimeout(() => connect(), 3000);
+      }
     });
   });
 }
@@ -171,6 +176,26 @@ server.tool("browser_screenshot", "Take a screenshot of the current page", {}, a
     };
   }
   return { content: [{ type: "text", text: result.data || "No screenshot data" }] };
+});
+
+server.tool("browser_hover", "Hover over an element by ref", { ref: z.string() }, async ({ ref }) => {
+  const result = await sendAction({ type: "hover", ref });
+  return { content: [{ type: "text", text: result.data || "Hovered" }] };
+});
+
+server.tool("browser_select", "Select an option from a dropdown by ref and values", { ref: z.string(), values: z.array(z.string()) }, async ({ ref, values }) => {
+  const result = await sendAction({ type: "select", ref, values });
+  return { content: [{ type: "text", text: result.data || "Selected" }] };
+});
+
+server.tool("browser_evaluate", "Run JavaScript in the browser page", { script: z.string() }, async ({ script }) => {
+  const result = await sendAction({ type: "evaluate", script });
+  return { content: [{ type: "text", text: result.data || "Evaluated" }] };
+});
+
+server.tool("browser_close", "Close the current browser tab", {}, async () => {
+  const result = await sendAction({ type: "close" });
+  return { content: [{ type: "text", text: result.data || "Closed" }] };
 });
 
 // --- Start ---
