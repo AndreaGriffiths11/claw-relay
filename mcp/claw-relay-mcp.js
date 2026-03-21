@@ -164,9 +164,14 @@ server.tool("browser_screenshot", "Take a screenshot of the current page", {}, a
 
 // --- Start ---
 async function main() {
-  await connect();
+  // Start stdio transport FIRST so Copilot CLI sees the MCP server immediately
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  // Then connect to the relay in the background
+  connect().catch((err) => {
+    console.error("Relay connection failed:", err.message);
+    process.exit(1);
+  });
 }
 
 main().catch((err) => {
