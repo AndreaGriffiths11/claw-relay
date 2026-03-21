@@ -10,9 +10,11 @@ export class AuditLogger {
   }
 
   log(entry: { agent_id: string; action: string; target?: string; ok: boolean; duration_ms: number; error?: string }) {
-    const record = { timestamp: new Date().toISOString(), ...entry };
+    const timestamp = new Date().toISOString();
+    const record = { timestamp, ...entry };
     const line = JSON.stringify(record);
-    this.stream?.write(line + '\n');
+    const lineWithNewline = line + '\n';
+    this.stream?.write(lineWithNewline);
     if (this.logToStdout) console.log(line);
   }
 }

@@ -10,21 +10,27 @@ export class RateLimiter {
     const now = Date.now();
     let bucket = this.tokens.get(agentId);
     
-    if (!bucket || now - bucket.lastReset >= 60000) {
+    const timeSinceReset = bucket ? now - bucket.lastReset : Infinity;
+    const needsReset = !bucket || timeSinceReset >= 60000;
+    if (needsReset) {
       bucket = { count: 0, lastReset: now, lastAccess: now };
       this.tokens.set(agentId, bucket);
     }
 
-    bucket.lastAccess = now;
-    if (bucket.count >= limit) return false;
-    bucket.count++;
+    const activeBucket = bucket!;
+    activeBucket.lastAccess = now;
+    const isOverLimit = activeBucket.count >= limit;
+    if (isOverLimit) return false;
+    activeBucket.count++;
     return true;
   }
 
   private cleanup(): void {
     const now = Date.now();
     for (const [key, bucket] of this.tokens) {
-      if (now - bucket.lastAccess > 300000) {
+      const timeSinceAccess = now - bucket.lastAccess;
+      const isExpired = timeSinceAccess > 300000;
+      if (isExpired) {
         this.tokens.delete(key);
       }
     }

@@ -37,8 +37,10 @@ const VALID_TYPES = new Set(['auth', 'snapshot', 'click', 'fill', 'navigate', 's
 export function parseMessage(raw: string): IncomingMessage | null {
   try {
     const msg = JSON.parse(raw);
-    if (!msg || typeof msg.type !== 'string') return null;
-    if (!VALID_TYPES.has(msg.type)) return null;
+    const hasValidStructure = msg && typeof msg.type === 'string';
+    if (!hasValidStructure) return null;
+    const isKnownType = VALID_TYPES.has(msg.type);
+    if (!isKnownType) return null;
     return msg as IncomingMessage;
   } catch {
     return null;
@@ -46,7 +48,10 @@ export function parseMessage(raw: string): IncomingMessage | null {
 }
 
 export function isAuthMessage(msg: IncomingMessage): msg is AuthMessage {
-  return msg.type === 'auth' && typeof (msg as any).token === 'string' && typeof (msg as any).agent_id === 'string';
+  const isAuthType = msg.type === 'auth';
+  const hasToken = typeof (msg as any).token === 'string';
+  const hasAgentId = typeof (msg as any).agent_id === 'string';
+  return isAuthType && hasToken && hasAgentId;
 }
 
 const ACTIONS = new Set(['snapshot', 'click', 'fill', 'navigate', 'screenshot', 'evaluate', 'press', 'hover', 'select', 'type', 'close']);
@@ -58,11 +63,14 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
 };
 
 export function isActionMessage(msg: IncomingMessage): msg is ActionMessage {
-  if (!ACTIONS.has(msg.type)) return false;
+  const isValidAction = ACTIONS.has(msg.type);
+  if (!isValidAction) return false;
   const required = REQUIRED_FIELDS[msg.type];
   if (required) {
     for (const field of required) {
-      if (!(field in msg) || typeof (msg as any)[field] !== 'string') return false;
+      const fieldExists = field in msg;
+      const fieldIsString = typeof (msg as any)[field] === 'string';
+      if (!fieldExists || !fieldIsString) return false;
     }
   }
   return true;

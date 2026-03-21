@@ -13,22 +13,32 @@ function getAdminToken(config: Config): string {
 
 function checkAuth(config: Config, req: Request): boolean {
   const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ') && authHeader.slice(7) === getAdminToken(config)) return true;
-  return false;
+  const adminToken = getAdminToken(config);
+  const isBearerAuth = authHeader?.startsWith('Bearer ');
+  if (!isBearerAuth) return false;
+  const providedToken = authHeader!.slice(7);
+  const tokenMatches = providedToken === adminToken;
+  return tokenMatches;
 }
 
 function redactToken(token: string): string {
-  if (token.length <= 4) return '****';
-  return '****' + token.slice(-4);
+  const isTooShort = token.length <= 4;
+  if (isTooShort) return '****';
+  const lastFourChars = token.slice(-4);
+  return '****' + lastFourChars;
 }
 
 function readAuditLog(config: Config): any[] {
   const logFile = config.audit.logFile;
-  const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
+  const isAbsolute = path.isAbsolute(logFile);
+  const absPath = isAbsolute ? logFile : path.join(process.cwd(), logFile);
   try {
     const content = fs.readFileSync(absPath, 'utf-8');
-    const lines = content.trim().split('\n').filter(Boolean);
-    return lines.slice(-100).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const allLines = content.trim().split('\n').filter(Boolean);
+    const recentLines = allLines.slice(-100);
+    const parsedEntries = recentLines.map(l => { try { return JSON.parse(l); } catch { return null; } });
+    const validEntries = parsedEntries.filter(Boolean);
+    return validEntries;
   } catch {
     return [];
   }
@@ -44,7 +54,8 @@ function writeConfigAtomic(configPath: string, config: Config): void {
     dashboard: config.dashboard,
   };
   const yamlStr = YAML.stringify(data);
-  const tmp = configPath + '.tmp.' + Date.now();
+  const tmpSuffix = '.tmp.' + Date.now();
+  const tmp = configPath + tmpSuffix;
   fs.writeFileSync(tmp, yamlStr, 'utf-8');
   fs.renameSync(tmp, configPath);
 }
@@ -54,24 +65,38 @@ const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 function validateAgentFields(body: any, requireIdToken: boolean): string | null {
   if (requireIdToken) {
-    if (typeof body.id !== 'string' || !AGENT_ID_RE.test(body.id))
+    const idIsString = typeof body.id === 'string';
+    const idMatchesPattern = idIsString && AGENT_ID_RE.test(body.id);
+    if (!idMatchesPattern)
       return 'id must be alphanumeric/hyphens/underscores, 1-64 chars';
-    if (typeof body.token !== 'string' || body.token.length < 8)
+    const tokenIsString = typeof body.token === 'string';
+    const tokenLongEnough = tokenIsString && body.token.length >= 8;
+    if (!tokenLongEnough)
       return 'token must be a string of at least 8 characters';
   } else {
-    if (body.token !== undefined && (typeof body.token !== 'string' || body.token.length < 8))
-      return 'token must be a string of at least 8 characters';
+    if (body.token !== undefined) {
+      const tokenIsString = typeof body.token === 'string';
+      const tokenLongEnough = tokenIsString && body.token.length >= 8;
+      if (!tokenLongEnough)
+        return 'token must be a string of at least 8 characters';
+    }
   }
   if (body.scopes !== undefined) {
-    if (!Array.isArray(body.scopes) || !body.scopes.every((s: any) => typeof s === 'string' && VALID_SCOPES.includes(s)))
+    const scopesIsArray = Array.isArray(body.scopes);
+    const allScopesValid = scopesIsArray && body.scopes.every((s: any) => typeof s === 'string' && VALID_SCOPES.includes(s));
+    if (!allScopesValid)
       return 'scopes must be an array of: ' + VALID_SCOPES.join(', ');
   }
   if (body.allowlist !== undefined) {
-    if (!Array.isArray(body.allowlist) || !body.allowlist.every((s: any) => typeof s === 'string'))
+    const allowlistIsArray = Array.isArray(body.allowlist);
+    const allStrings = allowlistIsArray && body.allowlist.every((s: any) => typeof s === 'string');
+    if (!allStrings)
       return 'allowlist must be an array of strings';
   }
   if (body.rateLimit !== undefined) {
-    if (typeof body.rateLimit !== 'number' || !Number.isInteger(body.rateLimit) || body.rateLimit <= 0)
+    const isNumber = typeof body.rateLimit === 'number';
+    const isPositiveInteger = isNumber && Number.isInteger(body.rateLimit) && body.rateLimit > 0;
+    if (!isPositiveInteger)
       return 'rateLimit must be a positive integer';
   }
   return null;
@@ -155,17 +180,21 @@ export function startDashboard(
 
   app.delete('/api/audit', (c) => {
     const logFile = config.audit.logFile;
-    const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
+    const isAbsolute = path.isAbsolute(logFile);
+    const absPath = isAbsolute ? logFile : path.join(process.cwd(), logFile);
     try { fs.writeFileSync(absPath, '', 'utf-8'); } catch {}
     return c.json({ ok: true });
   });
 
   app.get('/api/audit/download', (c) => {
     const entries = readAuditLog(config);
-    return new Response(JSON.stringify(entries, null, 2), {
+    const formattedJson = JSON.stringify(entries, null, 2);
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const filename = 'claw-relay-audit-' + dateStamp + '.json';
+    return new Response(formattedJson, {
       headers: {
         'Content-Type': 'application/json',
-        'Content-Disposition': 'attachment; filename="claw-relay-audit-' + new Date().toISOString().slice(0,10) + '.json"',
+        'Content-Disposition': 'attachment; filename="' + filename + '"',
       },
     });
   });

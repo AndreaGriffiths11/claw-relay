@@ -32,10 +32,13 @@ export class Engine {
     return new Promise((resolve) => {
       execFile(this.binary, args, { timeout: this.timeout }, (err, stdout, stderr) => {
         if (err) {
-          const errorMsg = stderr?.trim() || err.message || 'Unknown engine error';
+          const stderrTrimmed = stderr?.trim();
+          const errorMsg = stderrTrimmed || err.message || 'Unknown engine error';
           resolve({ ok: false, error: errorMsg });
         } else {
-          resolve({ ok: true, data: stdout.trim() || undefined });
+          const stdoutTrimmed = stdout.trim();
+          const data = stdoutTrimmed || undefined;
+          resolve({ ok: true, data });
         }
       });
     });
@@ -46,7 +49,9 @@ export class Engine {
 
   getCurrentUrl(): Promise<string | null> {
     const now = Date.now();
-    if (this.cachedUrl !== null && now - this.cachedUrlAt < 2000) {
+    const cacheAge = now - this.cachedUrlAt;
+    const cacheIsValid = this.cachedUrl !== null && cacheAge < 2000;
+    if (cacheIsValid) {
       return Promise.resolve(this.cachedUrl);
     }
     return new Promise((resolve) => {
@@ -54,9 +59,10 @@ export class Engine {
         if (err) {
           resolve(null);
         } else {
-          this.cachedUrl = stdout.trim();
+          const url = stdout.trim();
+          this.cachedUrl = url;
           this.cachedUrlAt = Date.now();
-          resolve(this.cachedUrl);
+          resolve(url);
         }
       });
     });

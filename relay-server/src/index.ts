@@ -38,7 +38,9 @@ const heartbeatInterval = setInterval(() => {
   const now = Date.now();
   for (const [agentId, ws] of connectedAgentIds) {
     const last = lastPong.get(agentId) || now;
-    if (now - last > 90000) {
+    const timeSinceLastPong = now - last;
+    const isStale = timeSinceLastPong > 90000;
+    if (isStale) {
       console.warn(`Agent ${agentId} stale (no pong in 90s), disconnecting`);
       ws.close(1001, 'Connection stale');
       continue;
@@ -48,7 +50,8 @@ const heartbeatInterval = setInterval(() => {
 }, 30000);
 
 function send(ws: any, msg: OutgoingMessage) {
-  ws.send(JSON.stringify(msg));
+  const serialized = JSON.stringify(msg);
+  ws.send(serialized);
 }
 
 async function handleMessage(ws: any, raw: string) {
@@ -123,7 +126,8 @@ async function handleMessage(ws: any, raw: string) {
   if (actionMsg.type === 'navigate' && actionMsg.url) {
     const check = isAllowed(actionMsg.url, agentCfg.allowlist, config.blocklist);
     if (!check.allowed) {
-      send(ws, { type: 'error', code: 'site_blocked', message: check.reason || 'Site blocked' });
+      const reason = check.reason || 'Site blocked';
+      send(ws, { type: 'error', code: 'site_blocked', message: reason });
       audit.log({ agent_id: agentId, action: actionMsg.type, target: actionMsg.url, ok: false, duration_ms: 0, error: 'site_blocked' });
       return;
     }
@@ -132,7 +136,8 @@ async function handleMessage(ws: any, raw: string) {
     if (currentUrl) {
       const check = isAllowed(currentUrl, agentCfg.allowlist, config.blocklist);
       if (!check.allowed) {
-        send(ws, { type: 'error', code: 'site_blocked', message: check.reason || 'Current site blocked' });
+        const reason = check.reason || 'Current site blocked';
+        send(ws, { type: 'error', code: 'site_blocked', message: reason });
         audit.log({ agent_id: agentId, action: actionMsg.type, target: currentUrl, ok: false, duration_ms: 0, error: 'site_blocked' });
         return;
       }
@@ -140,9 +145,10 @@ async function handleMessage(ws: any, raw: string) {
   }
 
   // Execute
-  const start = Date.now();
+  const startTime = Date.now();
   const result = await engine.execute(actionMsg);
-  const duration = Date.now() - start;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
 
   const target = actionMsg.ref || actionMsg.url || actionMsg.key || undefined;
   agentAction(agentId, actionMsg.type);
@@ -151,7 +157,8 @@ async function handleMessage(ws: any, raw: string) {
   if (result.ok) {
     send(ws, { type: 'result', action: actionMsg.type, ok: true, data: result.data });
   } else {
-    send(ws, { type: 'error', code: 'engine_error', message: result.error || 'Unknown error' });
+    const errorMessage = result.error || 'Unknown error';
+    send(ws, { type: 'error', code: 'engine_error', message: errorMessage });
   }
 }
 
@@ -171,8 +178,9 @@ const wsServer = Bun.serve({
       clients.set(ws, { authenticated: false });
     },
     message(ws, message) {
-      const raw = typeof message === 'string' ? message : new TextDecoder().decode(message);
-      handleMessage(ws, raw);
+      const isString = typeof message === 'string';
+      const decoded = isString ? message : new TextDecoder().decode(message);
+      handleMessage(ws, decoded);
     },
     close(ws) {
       const state = clients.get(ws);

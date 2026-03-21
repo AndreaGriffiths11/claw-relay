@@ -1,19 +1,23 @@
 export function matchesPattern(pattern: string, hostname: string): boolean {
   if (pattern === '*') return true;
-  const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+  const escapedDots = pattern.replace(/\./g, '\\.');
+  const escapedWildcards = escapedDots.replace(/\*/g, '.*');
+  const regex = new RegExp('^' + escapedWildcards + '$');
   return regex.test(hostname);
 }
 
 export function isAllowed(url: string, allowlist: string[] | undefined, blocklist: string[] | undefined): { allowed: boolean; reason?: string } {
   let hostname: string;
   try {
-    hostname = new URL(url).hostname;
+    const parsed = new URL(url);
+    hostname = parsed.hostname;
   } catch {
     return { allowed: false, reason: 'Invalid URL' };
   }
 
   // Global blocklist always wins
-  for (const pattern of blocklist || []) {
+  const effectiveBlocklist = blocklist || [];
+  for (const pattern of effectiveBlocklist) {
     if (matchesPattern(pattern, hostname)) {
       return { allowed: false, reason: `${hostname} is blocked` };
     }
