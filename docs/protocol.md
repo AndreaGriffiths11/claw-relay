@@ -33,6 +33,13 @@ Success:
 {"type": "result", "action": "snapshot", "ok": true, "data": "...accessibility tree..."}
 ```
 
+Screenshot (base64 tunneling):
+```json
+{"type": "result", "action": "screenshot", "ok": true, "data": "<base64-encoded-png>", "mimeType": "image/png"}
+```
+
+The `screenshot` action returns the full-page image as base64-encoded PNG data directly in the WebSocket response. No file paths, no local storage — the agent receives the raw image data it can decode or pass to a vision model.
+
 Error:
 ```json
 {"type": "error", "code": "permission_denied", "message": "Agent lacks 'interact' scope"}

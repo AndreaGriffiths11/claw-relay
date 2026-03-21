@@ -34,7 +34,7 @@ After auth succeeds, send actions as JSON:
 | Action | Scope | Payload |
 |--------|-------|---------|
 | `snapshot` | `read` | `{"type": "snapshot"}` — returns accessibility tree |
-| `screenshot` | `read` | `{"type": "screenshot"}` — returns base64 PNG |
+| `screenshot` | `read` | `{"type": "screenshot"}` — returns base64 PNG via WebSocket |
 | `click` | `interact` | `{"type": "click", "ref": "e5"}` |
 | `type` | `interact` | `{"type": "type", "ref": "e3", "text": "hello"}` |
 | `fill` | `interact` | `{"type": "fill", "ref": "e3", "text": "hello"}` |
@@ -49,6 +49,7 @@ After auth succeeds, send actions as JSON:
 
 ```json
 {"type": "result", "action": "snapshot", "ok": true, "data": "...accessibility tree..."}
+{"type": "result", "action": "screenshot", "ok": true, "data": "<base64-encoded-png>", "mimeType": "image/png"}
 {"type": "error", "code": "permission_denied", "message": "Agent lacks 'interact' scope"}
 {"type": "error", "code": "site_blocked", "message": "mail.google.com is blocked"}
 ```

@@ -6,7 +6,7 @@
 
 Agents connect via WebSocket → Claw Relay checks auth, permissions, and site access → then forwards actions to [agent-browser](https://github.com/vercel-labs/agent-browser), which controls Chrome via CDP.
 
-An AI agent can read pages, click buttons, fill forms, and navigate — on your actual browser, with your cookies and sessions — while you control exactly what it's allowed to touch.
+An AI agent can read pages, click buttons, fill forms, navigate, and **see the browser via screenshot tunneling** — on your actual browser, with your cookies and sessions — while you control exactly what it's allowed to touch.
 
 <p align="center">
   <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
@@ -34,6 +34,8 @@ cp relay-server/config.example.yaml relay-server/config.yaml
 
 That's it. The startup script checks for dependencies (Bun, agent-browser) and installs them automatically if missing. It then launches Chrome, connects agent-browser, starts the relay server, and opens a Cloudflare tunnel.
 
+Screenshots are tunneled as base64 data directly over the WebSocket — agents receive `{ data: "<base64>", mimeType: "image/png" }` in the response, so they can see the browser without needing filesystem access.
+
 Open `http://localhost:9334` for the dashboard — add agents, set scopes, manage allowlists.
 
 For manual setup or advanced options: **[Setup Guide →](docs/setup.md)**
@@ -44,6 +46,7 @@ For manual setup or advanced options: **[Setup Guide →](docs/setup.md)**
 - **Allowlists** control where agents can go (`github.com`, not `*`)
 - **Blocklist** always wins — blocked sites can't be reached by any agent
 - **Rate limiting** per agent
+- **Screenshot tunneling** — agents receive full-page screenshots as base64 PNG data over WebSocket, no file paths or local storage needed
 - **Audit log** records every action with timestamps
 
 Start with `read` scope only. Add more when you trust the setup.
