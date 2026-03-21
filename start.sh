@@ -19,6 +19,21 @@ done
 echo "🦞 Claw Relay Starting..."
 echo ""
 
+# Step 0: Check all required dependencies upfront
+MISSING=""
+if ! command -v bun >/dev/null 2>&1; then MISSING="$MISSING bun"; fi
+if [ "$TUNNEL" = "cloudflare" ] && ! command -v cloudflared >/dev/null 2>&1; then MISSING="$MISSING cloudflared"; fi
+
+if [ -n "$MISSING" ]; then
+  echo "✗ Missing dependencies:$MISSING"
+  echo ""
+  echo "  Install with:"
+  command -v bun >/dev/null 2>&1 || echo "    curl -fsSL https://bun.sh/install | bash"
+  command -v cloudflared >/dev/null 2>&1 || echo "    brew install cloudflared"
+  echo ""
+  exit 1
+fi
+
 # Step 1: Check dependencies
 if ! command -v agent-browser >/dev/null 2>&1; then
   echo "⚙ agent-browser not found — installing via cargo..."
