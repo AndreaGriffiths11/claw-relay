@@ -39,7 +39,19 @@ fi
 
 # Step 2: Check if config exists
 if [ ! -f "$RELAY_DIR/config.yaml" ]; then
-  echo "✗ No config.yaml found. Run: cp relay-server/config.example.yaml relay-server/config.yaml"
+  echo ""
+  echo "✗ No config.yaml found."
+  echo ""
+  echo "  Quick setup:"
+  echo "    cp relay-server/config.example.yaml relay-server/config.yaml"
+  echo ""
+  echo "  Then edit relay-server/config.yaml:"
+  echo "    - Change agent tokens (don't use the defaults)"
+  echo "    - Add/remove agents as needed"
+  echo "    - Set allowlists for which sites each agent can access"
+  echo ""
+  echo "  See docs/setup.md for full configuration reference."
+  echo ""
   exit 1
 fi
 
