@@ -8,6 +8,8 @@ Agents connect via WebSocket → Claw Relay checks auth, permissions, and site a
 
 An AI agent can read pages, click buttons, fill forms, navigate, and **see the browser via screenshot tunneling** — on your actual browser, with your cookies and sessions — while you control exactly what it's allowed to touch.
 
+Works with **Copilot CLI**, **Claude Code**, **OpenClaw**, **nanobot**, **ZeroClaw**, or any agent that speaks MCP or WebSocket.
+
 <p align="center">
   <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
 </p>
