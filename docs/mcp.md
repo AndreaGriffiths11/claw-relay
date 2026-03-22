@@ -19,7 +19,7 @@ cd mcp && npm install
 | `browser_press` | `key` | Press a key (Enter, Tab, etc.) |
 | `browser_hover` | `ref` | Hover over an element |
 | `browser_select` | `ref`, `values` | Select option from dropdown |
-| `browser_evaluate` | `script` | Run JavaScript in the page |
+| `browser_evaluate` | `js` | Run JavaScript in the page |
 | `browser_snapshot` | — | Get accessibility tree |
 | `browser_screenshot` | — | Take a screenshot |
 | `browser_close` | — | Close the current tab |

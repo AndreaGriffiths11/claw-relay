@@ -49,5 +49,7 @@ pub fn extract_admin_token(query: Option<&str>, headers: &axum::http::HeaderMap)
 
 pub fn check_admin_auth(admin_token: &str, provided: &str) -> bool {
     if admin_token.is_empty() { return false; }
-    constant_time_eq(admin_token.as_bytes(), provided.as_bytes())
+    let a = Sha256::digest(admin_token.as_bytes());
+    let b = Sha256::digest(provided.as_bytes());
+    constant_time_eq(&a, &b)
 }
