@@ -9,6 +9,8 @@ import { Engine } from './engine';
 import { agentConnected, agentDisconnected, agentAction, getState } from './state';
 import { startDashboard } from './dashboard';
 
+import type { ServerWebSocket } from 'bun';
+
 const configPath = process.argv[2] || path.join(import.meta.dir, '..', 'config.example.yaml');
 let config = loadConfig(configPath);
 
@@ -30,7 +32,7 @@ interface ClientState {
 }
 
 const clients = new WeakMap<object, ClientState>();
-const connectedAgentIds = new Map<string, any>();
+const connectedAgentIds = new Map<string, ServerWebSocket<unknown>>();
 const lastPong = new Map<string, number>();
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -52,12 +54,12 @@ const heartbeatInterval = setInterval(() => {
   }
 }, HEARTBEAT_INTERVAL_MS);
 
-function send(ws: any, msg: OutgoingMessage) {
+function send(ws: ServerWebSocket<unknown>, msg: OutgoingMessage) {
   const serialized = JSON.stringify(msg);
   ws.send(serialized);
 }
 
-async function handleMessage(ws: any, raw: string) {
+async function handleMessage(ws: ServerWebSocket<unknown>, raw: string) {
   const state = clients.get(ws)!;
   const msg = parseMessage(raw);
   if (!msg) {
@@ -176,9 +178,10 @@ async function handleMessage(ws: any, raw: string) {
           mimeType: 'image/png',
           request_id: reqId,
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : String(e);
         // Fall back to just the path if file read fails
-        console.error(`Screenshot tunnel error: ${e.message} (path: ${screenshotPath})`);
+        console.error(`Screenshot tunnel error: ${errMsg} (path: ${screenshotPath})`);
         send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, request_id: reqId });
       }
     } else {

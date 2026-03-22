@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as YAML from 'yaml';
 import { Context } from 'hono';
-import type { MiddlewareHandler, Next } from 'hono/types';
+import type { Next } from 'hono/types';
 import { Config, AgentConfig, loadConfig } from './auth';
 import { AgentState } from './state';
 import { tailLines } from './audit-logger';
@@ -95,17 +95,17 @@ const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 function validateAgentFields(body: AgentRequestBody, requireIdToken: boolean): string | null {
   if (requireIdToken) {
     const idIsString = typeof body.id === 'string';
-    const idMatchesPattern = idIsString && AGENT_ID_RE.test(body.id);
+    const idMatchesPattern = idIsString && AGENT_ID_RE.test(body.id!);
     if (!idMatchesPattern)
       return 'id must be alphanumeric/hyphens/underscores, 1-64 chars';
     const tokenIsString = typeof body.token === 'string';
-    const tokenLongEnough = tokenIsString && body.token.length >= 8;
+    const tokenLongEnough = tokenIsString && body.token!.length >= 8;
     if (!tokenLongEnough)
       return 'token must be a string of at least 8 characters';
   } else {
     if (body.token !== undefined) {
       const tokenIsString = typeof body.token === 'string';
-      const tokenLongEnough = tokenIsString && body.token.length >= 8;
+      const tokenLongEnough = tokenIsString && body.token!.length >= 8;
       if (!tokenLongEnough)
         return 'token must be a string of at least 8 characters';
     }
@@ -183,7 +183,7 @@ export function startDashboard(
   });
 
   // Auth middleware for API routes
-  const requireAuth: MiddlewareHandler = (c: Context, next: Next) => {
+  const requireAuth = async (c: Context, next: Next) => {
     if (!config.dashboard.adminToken) {
       return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
     }
