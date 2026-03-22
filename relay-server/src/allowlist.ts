@@ -1,9 +1,14 @@
 export function matchesPattern(pattern: string, hostname: string): boolean {
   if (pattern === '*') return true;
-  const escapedDots = pattern.replace(/\./g, '\\.');
-  const escapedWildcards = escapedDots.replace(/\*/g, '.*');
-  const regex = new RegExp('^' + escapedWildcards + '$');
-  return regex.test(hostname);
+
+  // String matching (consistent with Rust implementation)
+  // Supports: exact match, *.example.com (subdomain wildcard)
+  if (pattern.startsWith('*.')) {
+    const suffix = pattern.slice(1); // ".example.com"
+    return hostname === pattern.slice(2) || hostname.endsWith(suffix);
+  }
+
+  return hostname === pattern;
 }
 
 export function isAllowed(url: string, allowlist: string[] | undefined, blocklist: string[] | undefined): { allowed: boolean; reason?: string } {

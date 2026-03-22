@@ -8,6 +8,7 @@ use axum::{
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tower_http::cors::{CorsLayer, AllowOrigin};
 use tower_http::services::ServeDir;
 
 use crate::auth::check_admin_auth;
@@ -28,7 +29,7 @@ fn get_token(headers: &HeaderMap) -> Option<String> {
 }
 
 fn check_auth(state: &AppState, headers: &HeaderMap) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
-    let config = state.config.read().unwrap();
+    let config = state.config.read().expect("lock poisoned");
     if config.dashboard.admin_token.is_empty() {
         return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Dashboard disabled: no adminToken configured"}))));
     }
@@ -53,8 +54,8 @@ async fn status_handler(
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&state, &headers)?;
-    let conns = state.connections.read().unwrap();
-    let config = state.config.read().unwrap();
+    let conns = state.connections.read().expect("lock poisoned");
+    let config = state.config.read().expect("lock poisoned");
     
     let mut agents_status: HashMap<String, serde_json::Value> = HashMap::new();
     for (id, agent_cfg) in &config.agents {
@@ -82,7 +83,7 @@ async fn get_agents_handler(
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&state, &headers)?;
-    let config = state.config.read().unwrap();
+    let config = state.config.read().expect("lock poisoned");
     let mut agents: HashMap<String, serde_json::Value> = HashMap::new();
     for (id, agent) in &config.agents {
         agents.insert(id.clone(), serde_json::json!({
@@ -128,7 +129,7 @@ async fn create_agent_handler(
         }
     }
 
-    let mut config = state.config.write().unwrap();
+    let mut config = state.config.write().expect("lock poisoned");
     if config.agents.contains_key(&body.id) {
         return Err((StatusCode::CONFLICT, Json(serde_json::json!({"error": "Agent already exists"}))));
     }
@@ -161,7 +162,7 @@ async fn update_agent_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&state, &headers)?;
     
-    let mut config = state.config.write().unwrap();
+    let mut config = state.config.write().expect("lock poisoned");
     let agent = config.agents.get_mut(&id)
         .ok_or((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Agent not found"}))))?;
     
@@ -191,7 +192,7 @@ async fn delete_agent_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&state, &headers)?;
     
-    let mut config = state.config.write().unwrap();
+    let mut config = state.config.write().expect("lock poisoned");
     if config.agents.remove(&id).is_none() {
         return Err((StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "Agent not found"}))));
     }
@@ -237,7 +238,7 @@ async fn get_config_handler(
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&state, &headers)?;
-    let config = state.config.read().unwrap();
+    let config = state.config.read().expect("lock poisoned");
     let mut redacted: HashMap<String, serde_json::Value> = HashMap::new();
     for (id, agent) in &config.agents {
         redacted.insert(id.clone(), serde_json::json!({
@@ -277,7 +278,14 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/audit", get(get_audit_handler).delete(clear_audit_handler))
         .route("/api/audit/download", get(download_audit_handler))
         .route("/api/config", get(get_config_handler))
-        .with_state(state);
+        .with_state(state)
+        .layer(CorsLayer::new()
+            .allow_origin(AllowOrigin::list([
+                "http://localhost:9334".parse().unwrap(),
+                "http://127.0.0.1:9334".parse().unwrap(),
+            ]))
+            .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE])
+            .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]));
 
     if dashboard_dist.exists() {
         api.fallback_service(ServeDir::new(&dashboard_dist).fallback(tower_http::services::ServeFile::new(
@@ -289,7 +297,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 }
 
 pub async fn start_dashboard(state: Arc<AppState>) {
-    let port = state.config.read().unwrap().dashboard.port;
+    let port = state.config.read().expect("lock poisoned").dashboard.port;
     let router = create_router(state);
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
         .await

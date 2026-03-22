@@ -2,9 +2,43 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import * as YAML from 'yaml';
+import { Context } from 'hono';
+import type { Next } from 'hono/types';
 import { Config, AgentConfig, loadConfig } from './auth';
 import { AgentState } from './state';
+import { tailLines } from './audit-logger';
+
+/** Shape of the request body for agent CRUD operations */
+interface AgentRequestBody {
+  id?: string;
+  token?: string;
+  scopes?: string[];
+  allowlist?: string[];
+  rateLimit?: number;
+}
+
+/** A single audit log entry (parsed from JSONL) */
+interface AuditEntry {
+  agent_id?: string;
+  action?: string;
+  ok?: boolean;
+  duration_ms?: number;
+  error?: string;
+  target?: string;
+  timestamp?: string;
+}
+
+/** Config data written to YAML (mirrors Config but used for serialization) */
+interface ConfigData {
+  server: Config['server'];
+  agents: Config['agents'];
+  blocklist: Config['blocklist'];
+  audit: Config['audit'];
+  engine: Config['engine'];
+  dashboard: Config['dashboard'];
+}
 
 type GetStateFn = () => { connections: AgentState[]; startedAt: string };
 
@@ -18,8 +52,9 @@ function checkAuth(config: Config, req: Request): boolean {
   const isBearerAuth = authHeader?.startsWith('Bearer ');
   if (!isBearerAuth) return false;
   const providedToken = authHeader!.slice(7);
-  const tokenMatches = providedToken === adminToken;
-  return tokenMatches;
+  const providedHash = crypto.createHash('sha256').update(providedToken).digest();
+  const adminHash = crypto.createHash('sha256').update(adminToken).digest();
+  return crypto.timingSafeEqual(providedHash, adminHash);
 }
 
 function redactToken(token: string): string {
@@ -29,24 +64,17 @@ function redactToken(token: string): string {
   return '****' + lastFourChars;
 }
 
-function readAuditLog(config: Config): any[] {
+function readAuditLog(config: Config, limit: number = 200): AuditEntry[] {
   const logFile = config.audit.logFile;
   const isAbsolute = path.isAbsolute(logFile);
   const absPath = isAbsolute ? logFile : path.join(process.cwd(), logFile);
-  try {
-    const content = fs.readFileSync(absPath, 'utf-8');
-    const allLines = content.trim().split('\n').filter(Boolean);
-    const recentLines = allLines.slice(-100);
-    const parsedEntries = recentLines.map(l => { try { return JSON.parse(l); } catch { return null; } });
-    const validEntries = parsedEntries.filter(Boolean);
-    return validEntries;
-  } catch {
-    return [];
-  }
+  const lines = tailLines(absPath, limit);
+  const parsedEntries = lines.map(l => { try { return JSON.parse(l); } catch { return null; } });
+  return parsedEntries.filter(Boolean) as AuditEntry[];
 }
 
 function writeConfigAtomic(configPath: string, config: Config): void {
-  const data: any = {
+  const data: ConfigData = {
     server: config.server,
     agents: config.agents,
     blocklist: config.blocklist,
@@ -64,33 +92,33 @@ function writeConfigAtomic(configPath: string, config: Config): void {
 const VALID_SCOPES = ['navigate', 'read', 'interact', 'execute'];
 const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-function validateAgentFields(body: any, requireIdToken: boolean): string | null {
+function validateAgentFields(body: AgentRequestBody, requireIdToken: boolean): string | null {
   if (requireIdToken) {
     const idIsString = typeof body.id === 'string';
-    const idMatchesPattern = idIsString && AGENT_ID_RE.test(body.id);
+    const idMatchesPattern = idIsString && AGENT_ID_RE.test(body.id!);
     if (!idMatchesPattern)
       return 'id must be alphanumeric/hyphens/underscores, 1-64 chars';
     const tokenIsString = typeof body.token === 'string';
-    const tokenLongEnough = tokenIsString && body.token.length >= 8;
+    const tokenLongEnough = tokenIsString && body.token!.length >= 8;
     if (!tokenLongEnough)
       return 'token must be a string of at least 8 characters';
   } else {
     if (body.token !== undefined) {
       const tokenIsString = typeof body.token === 'string';
-      const tokenLongEnough = tokenIsString && body.token.length >= 8;
+      const tokenLongEnough = tokenIsString && body.token!.length >= 8;
       if (!tokenLongEnough)
         return 'token must be a string of at least 8 characters';
     }
   }
   if (body.scopes !== undefined) {
     const scopesIsArray = Array.isArray(body.scopes);
-    const allScopesValid = scopesIsArray && body.scopes.every((s: any) => typeof s === 'string' && VALID_SCOPES.includes(s));
+    const allScopesValid = scopesIsArray && body.scopes!.every((s: string) => typeof s === 'string' && VALID_SCOPES.includes(s));
     if (!allScopesValid)
       return 'scopes must be an array of: ' + VALID_SCOPES.join(', ');
   }
   if (body.allowlist !== undefined) {
     const allowlistIsArray = Array.isArray(body.allowlist);
-    const allStrings = allowlistIsArray && body.allowlist.every((s: any) => typeof s === 'string');
+    const allStrings = allowlistIsArray && body.allowlist!.every((s: string) => typeof s === 'string');
     if (!allStrings)
       return 'allowlist must be an array of strings';
   }
@@ -155,7 +183,7 @@ export function startDashboard(
   });
 
   // Auth middleware for API routes
-  const requireAuth = (c: any, next: any) => {
+  const requireAuth = async (c: Context, next: Next) => {
     if (!config.dashboard.adminToken) {
       return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
     }
@@ -169,7 +197,7 @@ export function startDashboard(
   app.use('/api/*', requireAuth);
 
   app.get('/api/config', (c) => {
-    const redacted: Record<string, any> = {};
+    const redacted: Record<string, Omit<AgentConfig, 'token'> & { token: string }> = {};
     for (const [id, agent] of Object.entries(config.agents)) {
       redacted[id] = { ...agent, token: redactToken(agent.token) };
     }
@@ -182,7 +210,9 @@ export function startDashboard(
   });
 
   app.get('/api/audit', (c) => {
-    const entries = readAuditLog(config);
+    const limitParam = c.req.query('limit');
+    const limit = limitParam ? Math.max(1, Math.min(10000, parseInt(limitParam, 10) || 200)) : 200;
+    const entries = readAuditLog(config, limit);
     return c.json({ entries });
   });
 
@@ -209,22 +239,23 @@ export function startDashboard(
 
   app.post('/api/agents', async (c) => {
     try {
-      const body = await c.req.json();
-      const { id, token, scopes, allowlist, rateLimit } = body;
+      const body = await c.req.json() as AgentRequestBody;
       const err = validateAgentFields(body, true);
       if (err) return c.json({ error: err }, 400);
+      const id = body.id!;
       if (config.agents[id]) return c.json({ error: 'Agent already exists' }, 409);
       config.agents[id] = {
-        token,
-        scopes: scopes || ['read'],
-        allowlist: allowlist || ['*'],
-        rateLimit: rateLimit || 30,
+        token: body.token!,
+        scopes: body.scopes || ['read'],
+        allowlist: body.allowlist || ['*'],
+        rateLimit: body.rateLimit || 30,
       };
       writeConfigAtomic(configPath, config);
       reloadCfg();
       return c.json({ ok: true }, 201);
-    } catch (e: any) {
-      return c.json({ error: e.message }, 400);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return c.json({ error: message }, 400);
     }
   });
 
@@ -232,7 +263,7 @@ export function startDashboard(
     const id = c.req.param('id');
     if (!config.agents[id]) return c.json({ error: 'Agent not found' }, 404);
     try {
-      const body = await c.req.json();
+      const body = await c.req.json() as AgentRequestBody;
       const err = validateAgentFields(body, false);
       if (err) return c.json({ error: err }, 400);
       if (body.scopes !== undefined) config.agents[id].scopes = body.scopes;
@@ -242,8 +273,9 @@ export function startDashboard(
       writeConfigAtomic(configPath, config);
       reloadCfg();
       return c.json({ ok: true });
-    } catch (e: any) {
-      return c.json({ error: e.message }, 400);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return c.json({ error: message }, 400);
     }
   });
 
