@@ -253,8 +253,9 @@ export function startDashboard(
       writeConfigAtomic(configPath, config);
       reloadCfg();
       return c.json({ ok: true }, 201);
-    } catch (e: any) {
-      return c.json({ error: e.message }, 400);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return c.json({ error: message }, 400);
     }
   });
 
@@ -262,7 +263,7 @@ export function startDashboard(
     const id = c.req.param('id');
     if (!config.agents[id]) return c.json({ error: 'Agent not found' }, 404);
     try {
-      const body = await c.req.json();
+      const body = await c.req.json() as AgentRequestBody;
       const err = validateAgentFields(body, false);
       if (err) return c.json({ error: err }, 400);
       if (body.scopes !== undefined) config.agents[id].scopes = body.scopes;
@@ -272,8 +273,9 @@ export function startDashboard(
       writeConfigAtomic(configPath, config);
       reloadCfg();
       return c.json({ ok: true });
-    } catch (e: any) {
-      return c.json({ error: e.message }, 400);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      return c.json({ error: message }, 400);
     }
   });
 
