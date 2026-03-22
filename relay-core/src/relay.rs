@@ -221,29 +221,29 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 }
             }
         } else if action != "close" {
-            // Feature 4: Check current page URL against blocklist for non-navigate, non-close actions
-            // TODO: Need engine support for "current-url" command to get the active page URL
-            // When available, uncomment and use:
-            // let url_result = execute_engine(&config.engine.binary, &["current-url".to_string()], config.engine.timeout).await;
-            // if let Ok(current_url) = url_result {
-            //     let check = is_allowed(&current_url, &cfg.allowlist, &config.blocklist);
-            //     if !check.allowed {
-            //         let reason = check.reason.unwrap_or_else(|| "Current site is blocked".to_string());
-            //         let mut resp = serde_json::json!({
-            //             "type": "error", "code": "site_blocked", "message": reason
-            //         });
-            //         if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
-            //         let mut s = sender.lock().await;
-            //         let _ = s.send(Message::Text(resp.to_string().into())).await;
-            //         state.audit.log(AuditEntry {
-            //             timestamp: chrono::Utc::now().to_rfc3339(),
-            //             agent_id: aid.clone(), action: action.to_string(),
-            //             target: Some(current_url), ok: false, duration_ms: 0,
-            //             error: Some("site_blocked".to_string()),
-            //         });
-            //         continue;
-            //     }
-            // }
+            // Check current page URL against blocklist for non-navigate, non-close actions
+            let url_result = execute_engine(&config.engine.binary, &["get".to_string(), "url".to_string()], config.engine.timeout).await;
+            if let Ok(current_url) = url_result {
+                if !current_url.is_empty() {
+                    let check = is_allowed(&current_url, &cfg.allowlist, &config.blocklist);
+                    if !check.allowed {
+                        let reason = check.reason.unwrap_or_else(|| "Current site is blocked".to_string());
+                        let mut resp = serde_json::json!({
+                            "type": "error", "code": "site_blocked", "message": reason
+                        });
+                        if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+                        let mut s = sender.lock().await;
+                        let _ = s.send(Message::Text(resp.to_string().into())).await;
+                        state.audit.log(AuditEntry {
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                            agent_id: aid.clone(), action: action.to_string(),
+                            target: Some(current_url), ok: false, duration_ms: 0,
+                            error: Some("site_blocked".to_string()),
+                        });
+                        continue;
+                    }
+                }
+            }
         }
 
         // Execute via engine
