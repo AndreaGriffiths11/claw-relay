@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import * as YAML from 'yaml';
 import { Config, AgentConfig, loadConfig } from './auth';
 import { AgentState } from './state';
@@ -18,8 +19,9 @@ function checkAuth(config: Config, req: Request): boolean {
   const isBearerAuth = authHeader?.startsWith('Bearer ');
   if (!isBearerAuth) return false;
   const providedToken = authHeader!.slice(7);
-  const tokenMatches = providedToken === adminToken;
-  return tokenMatches;
+  const providedHash = crypto.createHash('sha256').update(providedToken).digest();
+  const adminHash = crypto.createHash('sha256').update(adminToken).digest();
+  return crypto.timingSafeEqual(providedHash, adminHash);
 }
 
 function redactToken(token: string): string {

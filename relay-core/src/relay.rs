@@ -269,9 +269,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
                 // Screenshot tunneling: read the file and send as base64
                 if action == "screenshot" && !data.is_empty() {
-                    let path_re = regex::Regex::new(r"/\S+\.png").unwrap();
-                    if let Some(m) = path_re.find(&data) {
-                        let screenshot_path = m.as_str();
+                    // Extract path ending in .png using string matching (no regex)
+                    let screenshot_path = data.split_whitespace()
+                        .find(|s| s.starts_with('/') && s.ends_with(".png"));
+                    if let Some(screenshot_path) = screenshot_path {
                         match tokio::fs::read(screenshot_path).await {
                             Ok(bytes) => {
                                 use base64::Engine as _;
