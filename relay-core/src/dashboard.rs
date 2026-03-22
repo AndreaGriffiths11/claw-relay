@@ -8,6 +8,7 @@ use axum::{
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tower_http::cors::{CorsLayer, AllowOrigin};
 use tower_http::services::ServeDir;
 
 use crate::auth::check_admin_auth;
@@ -95,6 +96,7 @@ async fn get_agents_handler(
     Ok(Json(serde_json::json!(agents)))
 }
 
+#[derive(serde::Deserialize)]
 struct CreateAgentBody {
     id: String,
     token: String,
@@ -143,6 +145,7 @@ async fn create_agent_handler(
     Ok((StatusCode::CREATED, Json(serde_json::json!({"ok": true}))))
 }
 
+#[derive(serde::Deserialize)]
 struct UpdateAgentBody {
     token: Option<String>,
     scopes: Option<Vec<String>>,
@@ -275,7 +278,14 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/audit", get(get_audit_handler).delete(clear_audit_handler))
         .route("/api/audit/download", get(download_audit_handler))
         .route("/api/config", get(get_config_handler))
-        .with_state(state);
+        .with_state(state)
+        .layer(CorsLayer::new()
+            .allow_origin(AllowOrigin::list([
+                "http://localhost:9334".parse().unwrap(),
+                "http://127.0.0.1:9334".parse().unwrap(),
+            ]))
+            .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE])
+            .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]));
 
     if dashboard_dist.exists() {
         api.fallback_service(ServeDir::new(&dashboard_dist).fallback(tower_http::services::ServeFile::new(

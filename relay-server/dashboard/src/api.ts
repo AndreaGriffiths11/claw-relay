@@ -1,16 +1,6 @@
 const TOKEN_KEY = 'claw-dashboard-token';
 
 export function getToken(): string {
-  const params = new URLSearchParams(window.location.search);
-  const urlToken = params.get('token');
-  if (urlToken) {
-    localStorage.setItem(TOKEN_KEY, urlToken);
-    // Clean URL
-    const url = new URL(window.location.href);
-    url.searchParams.delete('token');
-    window.history.replaceState({}, '', url.toString());
-    return urlToken;
-  }
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 

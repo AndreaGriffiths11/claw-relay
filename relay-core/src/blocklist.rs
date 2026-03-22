@@ -26,6 +26,11 @@ pub fn is_allowed(url: &str, allowlist: &[String], blocklist: &[String]) -> Allo
         }
     }
 
+    // Empty allowlist = allow all (consistent with TS)
+    if allowlist.is_empty() {
+        return AllowCheckResult { allowed: true, reason: None };
+    }
+
     for pattern in allowlist {
         if matches_pattern(pattern, &hostname) {
             return AllowCheckResult { allowed: true, reason: None };

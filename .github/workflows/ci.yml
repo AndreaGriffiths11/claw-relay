@@ -17,9 +17,23 @@ jobs:
       - run: bun install
       - run: bunx tsc --noEmit
 
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: relay-server/dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx --yes typescript tsc --noEmit
+      - run: npm run build
+
   rust:
     runs-on: ubuntu-latest
-    continue-on-error: true  # Known pre-existing issues, tracked for cleanup
+    continue-on-error: true  # Pre-existing axum handler type issues
     defaults:
       run:
         working-directory: relay-core
