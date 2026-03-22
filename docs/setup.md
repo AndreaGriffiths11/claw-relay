@@ -131,3 +131,22 @@ ws.on('close', () => process.exit(0));
 ```
 
 You should see an accessibility tree of whatever tab is open in Chrome.
+
+## Rate Limiting
+
+`rateLimit` sets the maximum number of actions an agent can perform per minute. If an agent exceeds this, the relay rejects further actions until the window resets.
+
+This is a safety net — if an agent enters a loop, gets prompt-injected, or just goes rogue, rate limiting prevents it from hammering your browser with thousands of actions.
+
+**Recommendations:**
+
+| Use case | Suggested `rateLimit` | Why |
+|---|---|---|
+| Read-only agent (scraping, monitoring) | `15–30` | Just reading pages, low action count |
+| Interactive agent (clicking, filling forms) | `30–60` | Needs more headroom for multi-step flows |
+| Power agent (automation, testing) | `60–120` | Rapid sequences, but still bounded |
+| Development / debugging | `300` | High limit while you're watching |
+
+**If you're not sure, start with `30`.** That's one action every 2 seconds — enough for most agents, low enough to catch runaway loops. You can always increase it after observing your agent's behavior.
+
+Setting `rateLimit` is optional. If omitted, the agent has no action cap — fine for trusted local setups, but recommended for any agent with remote access.
