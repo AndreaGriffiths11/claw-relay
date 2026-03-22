@@ -1,16 +1,38 @@
 # Setup Guide
 
-## Prerequisites
+## Quick Start
 
 ```bash
-curl -fsSL https://bun.sh/install | bash   # install Bun runtime (or use Rust — see step 5)
-cargo install agent-browser                # browser automation engine (Rust CLI)
-brew install cloudflared                   # only if you want remote access (optional)
+git clone https://github.com/AndreaGriffiths11/claw-relay.git
+cd claw-relay
+cp relay-server/config.example.yaml relay-server/config.yaml  # edit with your agents
+./start.sh                                                     # handles everything
 ```
 
-> **Note:** `start.sh` checks for these dependencies and installs them automatically if missing.
+`start.sh` checks for dependencies (Bun, agent-browser, cloudflared) and installs any that are missing. It launches Chrome with remote debugging, starts the relay server, and opens a tunnel — one command.
 
-## 1. Install Dependencies
+```bash
+./start.sh                     # starts Chrome + relay + tunnel
+./start.sh --tunnel tailscale  # use Tailscale instead
+./start.sh --no-tunnel         # local only
+./stop.sh                      # stop everything
+```
+
+---
+
+## Manual Setup
+
+If you prefer to set things up step by step.
+
+### Prerequisites
+
+```bash
+curl -fsSL https://bun.sh/install | bash   # Bun runtime (or use Rust — see below)
+cargo install agent-browser                # browser automation engine (Rust CLI)
+brew install cloudflared                   # remote access (optional)
+```
+
+### 1. Install Dependencies
 
 ```bash
 cd relay-server
@@ -19,7 +41,7 @@ bun install          # must be inside relay-server/, not the repo root
 
 > No build step needed — Bun runs TypeScript directly.
 
-## 2. Configure
+### 2. Configure
 
 ```bash
 cp config.example.yaml config.yaml
@@ -59,7 +81,7 @@ dashboard:
 
 > **YAML gotcha:** Each key can only appear once per block. Replace lines — don't add duplicates.
 
-## 3. Launch Chrome with Remote Debugging
+### 3. Launch Chrome with Remote Debugging
 
 Quit Chrome completely first (Cmd+Q on macOS). The debug port won't bind if Chrome is already running.
 
@@ -75,13 +97,13 @@ google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 
 > Use `/tmp/chrome-debug` for a clean test profile, or point to your real profile once you trust the setup.
 
-## 4. Connect agent-browser to Chrome
+### 4. Connect agent-browser to Chrome
 
 ```bash
 agent-browser connect http://localhost:9222
 ```
 
-## 5. Start the Relay
+### 5. Start the Relay
 
 **Bun (default):**
 ```bash
@@ -102,18 +124,7 @@ Claw Relay server listening on 0.0.0.0:9333
 Dashboard running on http://localhost:9334
 ```
 
-## One-Command Start
-
-Or skip all of the above:
-
-```bash
-./start.sh                     # starts Chrome + relay + tunnel
-./start.sh --tunnel tailscale  # use Tailscale instead
-./start.sh --no-tunnel         # local only
-./stop.sh                      # stop everything
-```
-
-## 6. Test It
+### 6. Test It
 
 ```bash
 node -e "
@@ -131,6 +142,21 @@ ws.on('close', () => process.exit(0));
 ```
 
 You should see an accessibility tree of whatever tab is open in Chrome.
+
+---
+
+## Chrome Extension (Local Install)
+
+While the Chrome Web Store listing is pending, you can load the extension manually:
+
+1. Open `chrome://extensions` in Chrome
+2. Enable **Developer mode** (toggle in top right)
+3. Click **Load unpacked**
+4. Select the `extension/` folder from the cloned repo
+
+The extension icon will appear in your toolbar. Click it to configure your relay URL and API key.
+
+---
 
 ## Rate Limiting
 
