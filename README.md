@@ -14,27 +14,25 @@ Works with **Copilot CLI**, **Claude Code**, **OpenClaw**, **nanobot**, **ZeroCl
   <img src="docs/architecture.png" alt="Claw Relay Architecture" width="600">
 </p>
 
+## Prerequisites
+
+- [Bun](https://bun.sh) (v1.0+) — `curl -fsSL https://bun.sh/install | bash`
+- Google Chrome or Chromium
+- macOS, Linux, or WSL on Windows (see [Windows/WSL setup](#windowswsl))
+
 ## Quick Start
-
-**As a Copilot CLI / Claude Code plugin:**
-
-```bash
-git clone https://github.com/AndreaGriffiths11/claw-relay.git
-copilot plugin install ./claw-relay    # Copilot CLI
-# or
-claude plugin install ./claw-relay     # Claude Code
-```
-
-**Standalone:**
 
 ```bash
 git clone https://github.com/AndreaGriffiths11/claw-relay.git
 cd claw-relay
 cp relay-server/config.example.yaml relay-server/config.yaml
+# Edit config.yaml — change agent tokens from defaults!
 ./start.sh
 ```
 
 The startup script installs dependencies, launches Chrome, starts the relay, and opens a tunnel. Dashboard at `http://localhost:9334`.
+
+**Then connect your agent via MCP** — see [MCP docs](docs/mcp.md) for Copilot CLI, Claude Code, or any MCP client.
 
 ## How It Works
 
@@ -71,6 +69,17 @@ Optional toolbar status dashboard. [Full install guide →](extension/README.md)
 
 1. `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
 2. Click the icon for connection status and recent actions
+
+## Windows/WSL
+
+Claw Relay runs on Windows via [WSL](https://learn.microsoft.com/en-us/windows/wsl/install):
+
+1. Install WSL: `wsl --install` in PowerShell (admin)
+2. Install Bun inside WSL: `curl -fsSL https://bun.sh/install | bash`
+3. Clone and run inside WSL — `start.sh` detects WSL Chrome paths automatically
+4. Chrome must be installed on Windows (not inside WSL) — the script finds it via `/mnt/c/`
+
+Native Windows (PowerShell/CMD) is not supported — use WSL.
 
 ## Powered By
 

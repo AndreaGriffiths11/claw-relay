@@ -70,6 +70,14 @@ if [ ! -f "$RELAY_DIR/config.yaml" ]; then
   exit 1
 fi
 
+# Warn about default tokens
+if grep -q 'secret-token-1\|change-me' "$RELAY_DIR/config.yaml" 2>/dev/null; then
+  echo ""
+  echo "⚠️  Default tokens detected in config.yaml!"
+  echo "   Change agent tokens and adminToken before exposing to the internet."
+  echo ""
+fi
+
 # Step 3: Install dependencies if needed
 if [ ! -d "$RELAY_DIR/node_modules" ]; then
   echo "⚙ Installing dependencies..."

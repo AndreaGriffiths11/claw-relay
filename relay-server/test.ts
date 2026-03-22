@@ -4,7 +4,7 @@ const ws = new WebSocket('ws://127.0.0.1:9333');
 
 ws.on('open', () => {
   console.log('Connected. Sending auth...');
-  ws.send(JSON.stringify({ type: 'auth', token: 'secret-token-1', agent_id: 'deploy-bot' }));
+  ws.send(JSON.stringify({ type: 'auth', token: process.env.RELAY_TOKEN || 'secret-token-1', agent_id: process.env.RELAY_AGENT || 'deploy-bot' }));
 });
 
 ws.on('message', (data: Buffer) => {

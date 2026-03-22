@@ -33,13 +33,16 @@ const clients = new WeakMap<object, ClientState>();
 const connectedAgentIds = new Map<string, any>();
 const lastPong = new Map<string, number>();
 
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const STALE_CONNECTION_MS = 90_000;
+
 // Heartbeat: ping every 30s, kill stale connections after 90s
 const heartbeatInterval = setInterval(() => {
   const now = Date.now();
   for (const [agentId, ws] of connectedAgentIds) {
     const last = lastPong.get(agentId) || now;
     const timeSinceLastPong = now - last;
-    const isStale = timeSinceLastPong > 90000;
+    const isStale = timeSinceLastPong > STALE_CONNECTION_MS;
     if (isStale) {
       console.warn(`Agent ${agentId} stale (no pong in 90s), disconnecting`);
       ws.close(1001, 'Connection stale');
@@ -47,7 +50,7 @@ const heartbeatInterval = setInterval(() => {
     }
     ws.send(JSON.stringify({ type: 'ping' }));
   }
-}, 30000);
+}, HEARTBEAT_INTERVAL_MS);
 
 function send(ws: any, msg: OutgoingMessage) {
   const serialized = JSON.stringify(msg);

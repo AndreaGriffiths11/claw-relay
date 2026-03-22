@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as YAML from 'yaml';
@@ -140,6 +141,13 @@ export function startDashboard(
   }
 
   const app = new Hono();
+
+  // CORS — dashboard is local, restrict to localhost origins
+  app.use('*', cors({
+    origin: ['http://localhost:9334', 'http://127.0.0.1:9334'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowHeaders: ['Authorization', 'Content-Type'],
+  }));
 
   // Health endpoint (no auth required)
   app.get('/health', (c) => {

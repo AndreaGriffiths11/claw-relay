@@ -39,7 +39,7 @@ export function loadConfig(path: string): Config {
   const server = parsed.server || { port: 9222, host: '127.0.0.1' };
   const blocklist = parsed.blocklist || [];
   const audit = parsed.audit || { logFile: './audit.jsonl', logToStdout: true };
-  const engine = parsed.engine || { binary: 'agent-browser', timeout: 30000 };
+  const engine = parsed.engine || { binary: 'agent-browser', timeout: 30_000 };
   const dashboardPort = parsed.dashboard?.port || 9334;
   const dashboardAdminToken = parsed.dashboard?.adminToken || '';
   const dashboard = { port: dashboardPort, adminToken: dashboardAdminToken };
