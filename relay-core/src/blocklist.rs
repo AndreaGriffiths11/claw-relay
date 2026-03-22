@@ -44,7 +44,7 @@ fn extract_hostname(url: &str) -> Option<String> {
     let after_scheme = url.find("://").map(|pos| &url[pos + 3..])?;
     let host_part = after_scheme.split('/').next()?;
     let host = host_part.split(':').next()?;
-    let host = host.split('@').last()?;
+    let host = host.split('@').next_back()?;
     Some(host.to_lowercase())
 }
 

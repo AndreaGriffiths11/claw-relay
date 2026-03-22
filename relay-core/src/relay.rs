@@ -43,7 +43,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             Err(_) => {
                 let _ = sender.send(Message::Text(serde_json::json!({
                     "type": "error", "code": "invalid_message", "message": "Could not parse message"
-                }).to_string().into())).await;
+                }).to_string())).await;
                 continue;
             }
         };
@@ -53,7 +53,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         if msg_type != "auth" {
             let _ = sender.send(Message::Text(serde_json::json!({
                 "type": "error", "code": "not_authenticated", "message": "Send auth message first"
-            }).to_string().into())).await;
+            }).to_string())).await;
             continue;
         }
 
@@ -65,14 +65,14 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             None => {
                 let _ = sender.send(Message::Text(serde_json::json!({
                     "type": "error", "code": "auth_failed", "message": "Invalid token or agent_id"
-                }).to_string().into())).await;
+                }).to_string())).await;
                 return;
             }
             Some(cfg) => {
                 if state.is_agent_connected(aid) {
                     let _ = sender.send(Message::Text(serde_json::json!({
                         "type": "error", "code": "duplicate_agent", "message": "Agent ID already connected"
-                    }).to_string().into())).await;
+                    }).to_string())).await;
                     return;
                 }
                 authenticated = true;
@@ -81,7 +81,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 state.agent_connected(aid);
                 let _ = sender.send(Message::Text(serde_json::json!({
                     "type": "result", "action": "auth", "ok": true
-                }).to_string().into())).await;
+                }).to_string())).await;
                 break;
             }
         }
@@ -115,7 +115,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             }
             let mut s = ping_sender.lock().await;
             if s.send(Message::Text(
-                serde_json::json!({"type":"ping"}).to_string().into()
+                serde_json::json!({"type":"ping"}).to_string()
             )).await.is_err() {
                 break;
             }
@@ -137,7 +137,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 let mut s = sender.lock().await;
                 let _ = s.send(Message::Text(serde_json::json!({
                     "type": "error", "code": "invalid_message", "message": "Could not parse message"
-                }).to_string().into())).await;
+                }).to_string())).await;
                 continue;
             }
         };
@@ -159,7 +159,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             let mut s = sender.lock().await;
             let _ = s.send(Message::Text(serde_json::json!({
                 "type": "error", "code": "invalid_action", "message": "Unknown action type"
-            }).to_string().into())).await;
+            }).to_string())).await;
             continue;
         }
 
@@ -171,7 +171,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             });
             if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
             let mut s = sender.lock().await;
-            let _ = s.send(Message::Text(resp.to_string().into())).await;
+            let _ = s.send(Message::Text(resp.to_string())).await;
             state.audit.log(AuditEntry {
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 agent_id: aid.clone(), action: action.to_string(),
@@ -188,7 +188,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             });
             if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
             let mut s = sender.lock().await;
-            let _ = s.send(Message::Text(resp.to_string().into())).await;
+            let _ = s.send(Message::Text(resp.to_string())).await;
             state.audit.log(AuditEntry {
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 agent_id: aid.clone(), action: action.to_string(),
@@ -210,7 +210,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     });
                     if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                     let mut s = sender.lock().await;
-                    let _ = s.send(Message::Text(resp.to_string().into())).await;
+                    let _ = s.send(Message::Text(resp.to_string())).await;
                     state.audit.log(AuditEntry {
                         timestamp: chrono::Utc::now().to_rfc3339(),
                         agent_id: aid.clone(), action: action.to_string(),
@@ -233,7 +233,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                         });
                         if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                         let mut s = sender.lock().await;
-                        let _ = s.send(Message::Text(resp.to_string().into())).await;
+                        let _ = s.send(Message::Text(resp.to_string())).await;
                         state.audit.log(AuditEntry {
                             timestamp: chrono::Utc::now().to_rfc3339(),
                             agent_id: aid.clone(), action: action.to_string(),
@@ -283,7 +283,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                 });
                                 if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                                 let mut s = sender.lock().await;
-                                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                                let _ = s.send(Message::Text(resp.to_string())).await;
                                 continue;
                             }
                             Err(e) => {
@@ -300,7 +300,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 }
                 if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                 let mut s = sender.lock().await;
-                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                let _ = s.send(Message::Text(resp.to_string())).await;
             }
             Err(e) => {
                 state.audit.log(AuditEntry {
@@ -314,7 +314,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                 });
                 if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                 let mut s = sender.lock().await;
-                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                let _ = s.send(Message::Text(resp.to_string())).await;
             }
         }
     }

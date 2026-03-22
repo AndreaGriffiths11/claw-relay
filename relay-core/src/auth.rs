@@ -23,18 +23,6 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     diff == 0
 }
 
-/// Extract admin token from query string or Authorization header
-pub fn extract_admin_token(headers: &axum::http::HeaderMap) -> Option<String> {
-    if let Some(auth) = headers.get("authorization") {
-        if let Ok(val) = auth.to_str() {
-            if let Some(token) = val.strip_prefix("Bearer ") {
-                return Some(token.to_string());
-            }
-        }
-    }
-    None
-}
-
 pub fn check_admin_auth(admin_token: &str, provided: &str) -> bool {
     if admin_token.is_empty() { return false; }
     let a = Sha256::digest(admin_token.as_bytes());

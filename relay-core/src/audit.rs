@@ -53,6 +53,7 @@ impl AuditLogger {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_entries(&self) -> Vec<AuditEntry> {
         self.entries.read().map(|e| e.clone()).unwrap_or_default()
     }
