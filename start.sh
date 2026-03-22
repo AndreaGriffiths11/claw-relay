@@ -19,26 +19,104 @@ done
 echo "🦞 Claw Relay Starting..."
 echo ""
 
-# Step 1: Check dependencies
-command -v agent-browser >/dev/null 2>&1 || { echo "✗ agent-browser not found. Run: npm install -g agent-browser"; exit 1; }
-command -v node >/dev/null 2>&1 || { echo "✗ node not found"; exit 1; }
+# Step 0: Check all required dependencies upfront
+MISSING=""
+if ! command -v bun >/dev/null 2>&1; then MISSING="$MISSING bun"; fi
+if [ "$TUNNEL" = "cloudflare" ] && ! command -v cloudflared >/dev/null 2>&1; then MISSING="$MISSING cloudflared"; fi
 
-# Step 2: Check if config exists
-if [ ! -f "$RELAY_DIR/config.yaml" ]; then
-  echo "✗ No config.yaml found. Run: cp relay-server/config.example.yaml relay-server/config.yaml"
+if [ -n "$MISSING" ]; then
+  echo "✗ Missing dependencies:$MISSING"
+  echo ""
+  echo "  Install with:"
+  command -v bun >/dev/null 2>&1 || echo "    curl -fsSL https://bun.sh/install | bash"
+  command -v cloudflared >/dev/null 2>&1 || echo "    brew install cloudflared"
+  echo ""
   exit 1
 fi
 
-# Step 3: Check if dist exists, build if not
-if [ ! -f "$RELAY_DIR/dist/index.js" ]; then
-  echo "⚙ Building relay server..."
-  cd "$RELAY_DIR" && npx tsc
+# Step 1: Check dependencies
+if ! command -v agent-browser >/dev/null 2>&1; then
+  echo "⚙ agent-browser not found — installing via cargo..."
+  if command -v cargo >/dev/null 2>&1; then
+    cargo install agent-browser
+    echo "  ✓ agent-browser installed"
+  else
+    echo "✗ agent-browser requires Rust. Install Rust first: https://rustup.rs"
+    exit 1
+  fi
+fi
+if ! command -v bun >/dev/null 2>&1; then
+  echo "⚙ bun not found — installing..."
+  curl -fsSL https://bun.sh/install | bash
+  export PATH="$HOME/.bun/bin:$PATH"
+  echo "  ✓ bun installed"
+fi
+
+# Step 2: Check if config exists
+if [ ! -f "$RELAY_DIR/config.yaml" ]; then
+  echo ""
+  echo "✗ No config.yaml found."
+  echo ""
+  echo "  Quick setup:"
+  echo "    cp relay-server/config.example.yaml relay-server/config.yaml"
+  echo ""
+  echo "  Then edit relay-server/config.yaml:"
+  echo "    - Change agent tokens (don't use the defaults)"
+  echo "    - Add/remove agents as needed"
+  echo "    - Set allowlists for which sites each agent can access"
+  echo ""
+  echo "  See docs/setup.md for full configuration reference."
+  echo ""
+  exit 1
+fi
+
+# Warn about default tokens
+if grep -q 'secret-token-1\|change-me' "$RELAY_DIR/config.yaml" 2>/dev/null; then
+  echo ""
+  echo "⚠️  Default tokens detected in config.yaml!"
+  echo "   Change agent tokens and adminToken before exposing to the internet."
+  echo ""
+fi
+
+# Step 3: Install dependencies if needed
+if [ ! -d "$RELAY_DIR/node_modules" ]; then
+  echo "⚙ Installing dependencies..."
+  cd "$RELAY_DIR" && bun install
+fi
+
+# Step 3.5: Build dashboard if not built
+if [ ! -d "$RELAY_DIR/dashboard/dist" ]; then
+  echo "🎨 Building dashboard..."
+  cd "$RELAY_DIR/dashboard" && bun install && bun run build
+  echo "  ✓ Dashboard built"
 fi
 
 # Step 4: Launch Chrome with remote debugging
 echo "🌐 Launching Chrome with remote debugging..."
-CHROME_APP="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CHROME_DATA="/tmp/claw-relay-chrome"
+
+# Find Chrome binary (support CHROME_PATH override)
+find_chrome() {
+  if [ -n "$CHROME_PATH" ]; then
+    if [ -x "$CHROME_PATH" ]; then echo "$CHROME_PATH"; return; fi
+    echo "✗ CHROME_PATH set but not executable: $CHROME_PATH" >&2; return 1
+  fi
+  # macOS
+  if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+    echo "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; return
+  fi
+  # Linux
+  for cmd in google-chrome google-chrome-stable chromium chromium-browser; do
+    if command -v "$cmd" >/dev/null 2>&1; then echo "$cmd"; return; fi
+  done
+  # WSL
+  if [ -x "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" ]; then
+    echo "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"; return
+  fi
+  return 1
+}
+
+CHROME_APP="$(find_chrome)" || { echo "✗ Chrome not found. Set CHROME_PATH environment variable."; exit 1; }
 
 # Check if Chrome is already running with debugging
 if curl -s http://localhost:9222/json/version >/dev/null 2>&1; then
@@ -64,7 +142,7 @@ echo "  ✓ Connected"
 # Step 6: Start relay server
 echo "📡 Starting relay server..."
 cd "$RELAY_DIR"
-node dist/index.js config.yaml &
+bun src/index.ts config.yaml &
 RELAY_PID=$!
 sleep 1
 echo "  ✓ Relay running (PID $RELAY_PID)"
@@ -75,20 +153,31 @@ case $TUNNEL in
   cloudflare)
     echo "☁️  Starting Cloudflare tunnel..."
     command -v cloudflared >/dev/null 2>&1 || { echo "  ✗ cloudflared not found. Run: brew install cloudflared"; exit 1; }
-    cloudflared tunnel --url http://localhost:9333 2>&1 | while IFS= read -r line; do
-      if echo "$line" | grep -q "trycloudflare.com"; then
-        URL=$(echo "$line" | grep -oE 'https://[^ ]+trycloudflare.com')
-        if [ -n "$URL" ]; then
-          echo ""
-          echo "🦞 ═══════════════════════════════════════════"
-          echo "   Claw Relay is live!"
-          echo "   Local:  ws://localhost:9333"
-          echo "   Remote: $URL"
-          echo "═══════════════════════════════════════════════"
-          echo ""
-        fi
-      fi
+    echo ""
+    echo "💡 If the tunnel fails or you need to restart it separately:"
+    echo "   cloudflared tunnel --url http://localhost:9333"
+    echo ""
+    TUNNEL_LOG="/tmp/claw-relay-tunnel.log"
+    cloudflared tunnel --url http://localhost:9333 --no-autoupdate > "$TUNNEL_LOG" 2>&1 &
+    TUNNEL_PID=$!
+    # Wait for tunnel URL (up to 15 seconds)
+    URL=""
+    for i in $(seq 1 15); do
+      sleep 1
+      URL=$(grep -oE 'https://[^ ]+trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1)
+      if [ -n "$URL" ]; then break; fi
     done
+    if [ -n "$URL" ]; then
+      echo ""
+      echo "🦞 ═══════════════════════════════════════════"
+      echo "   Claw Relay is live!"
+      echo "   Local:  ws://localhost:9333"
+      echo "   Remote: $URL"
+      echo "═══════════════════════════════════════════════"
+      echo ""
+    else
+      echo "  ⚠ Tunnel started but URL not detected. Check: cat $TUNNEL_LOG"
+    fi
     ;;
   tailscale)
     echo "🔒 Starting Tailscale serve..."

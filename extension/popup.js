@@ -1,7 +1,15 @@
-const RELAY_URL = 'http://localhost:9333';
+const DEFAULTS = {
+  relayUrl: 'ws://localhost:9333',
+  apiKey: '',
+  agentId: 'my-agent'
+};
+
+let RELAY_URL = 'http://localhost:9333';
+let API_KEY = '';
 
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
+const relayUrlDisplay = document.getElementById('relayUrlDisplay');
 const agentName = document.getElementById('agentName');
 const agentScopes = document.getElementById('agentScopes');
 const actionsList = document.getElementById('actionsList');
@@ -11,7 +19,9 @@ let paused = false;
 
 async function checkRelay() {
   try {
-    const resp = await fetch(`${RELAY_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    const headers = {};
+    if (API_KEY) headers['Authorization'] = `Bearer ${API_KEY}`;
+    const resp = await fetch(`${RELAY_URL}/health`, { signal: AbortSignal.timeout(3000), headers });
     if (resp.ok) {
       const data = await resp.json().catch(() => ({}));
       setConnected(true);
@@ -70,10 +80,25 @@ function updateActions(actions) {
 }
 
 // Load state
-chrome.storage.local.get(['paused', 'recentActions'], (result) => {
-  paused = result.paused || false;
-  updateToggle();
-  if (result.recentActions) updateActions(result.recentActions);
+chrome.storage.sync.get(DEFAULTS, (syncResult) => {
+  const url = syncResult.relayUrl || DEFAULTS.relayUrl;
+  RELAY_URL = url.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/$/, '');
+  API_KEY = syncResult.apiKey || '';
+  relayUrlDisplay.textContent = url;
+
+  chrome.storage.local.get(['paused', 'recentActions'], (result) => {
+    paused = result.paused || false;
+    updateToggle();
+    if (result.recentActions) updateActions(result.recentActions);
+  });
+
+  checkRelay();
+});
+
+// Settings link
+document.getElementById('settingsLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.runtime.openOptionsPage();
 });
 
 toggleBtn.addEventListener('click', () => {
@@ -90,5 +115,4 @@ function updateToggle() {
 }
 
 // Poll every 5 seconds while popup is open
-checkRelay();
 setInterval(checkRelay, 5000);

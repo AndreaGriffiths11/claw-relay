@@ -1,20 +1,28 @@
 # Dashboard
 
-Claw Relay includes a built-in web dashboard for managing agents, viewing live connections, and browsing the audit log.
+Claw Relay™ includes a built-in dashboard for managing agents, viewing live connections, and browsing the audit log.
 
-## Accessing the Dashboard
+## Access
 
-The dashboard starts automatically with the relay on port `9334`:
+The dashboard runs on port `9334`:
 
 ```
-Dashboard running on http://localhost:9334
+http://localhost:9334
 ```
 
-Open `http://localhost:9334` in your browser. You'll be prompted for the admin token.
+Enter your admin token in the auth modal when prompted.
+
+## Build
+
+```bash
+cd relay-server/dashboard
+bun install
+bun run build
+```
+
+`start.sh` builds automatically if `dashboard/dist/` doesn't exist.
 
 ## Configuration
-
-Add to your `config.yaml`:
 
 ```yaml
 dashboard:
@@ -22,42 +30,21 @@ dashboard:
   adminToken: "your-secret-admin-token"
 ```
 
-If `adminToken` is not set, it defaults to the first agent's token.
+## Pages
 
-## Features
+- **Overview** (`/`) — Connected agents, total actions, uptime
+- **Agents** (`/agents`) — Add, edit, delete agents. Scope pills (read, interact, navigate, execute), online/offline status, allowlists, rate limits
+- **Audit Log** (`/audit`) — Filterable, paginated, color-coded. Search, download, clear
+- **Settings** (`/settings`) — Current config, version, logout
 
-- **Live status** — connected agents, total actions today, server uptime
-- **Agent management** — add, edit, and delete agents from the UI
-- **Audit log** — every action color-coded by success/failure, auto-refreshes
-- **Config sync** — changes write directly to `config.yaml` and take effect immediately
+## Adding an Agent
 
-## Adding a New Agent
+1. Go to **Agents** → **+ Add Agent**
+2. Set agent ID, generate or enter a token
+3. Select scopes: `read`, `navigate`, `interact`, `execute`
+4. Add allowed sites and rate limit
+5. **Create Agent**
 
-1. Click **+ Add Agent**
-2. Enter an agent ID (e.g. `my-copilot`)
-3. Click **Auto-generate** for a secure token, or enter your own
-4. Select scopes:
-   - **read** — snapshots and screenshots only
-   - **navigate** — can open URLs
-   - **interact** — can click, type, fill forms
-   - **execute** — can run JavaScript (use with caution)
-5. Add allowed sites (one per line, e.g. `github.com`)
-6. Set a rate limit (actions per minute)
-7. Click **Create Agent**
+## Tech Stack
 
-## Connecting an Agent
-
-Once configured via the dashboard, agents connect via WebSocket:
-
-```javascript
-const ws = new WebSocket('ws://localhost:9333');
-ws.on('open', () => {
-  ws.send(JSON.stringify({
-    type: 'auth',
-    token: 'the-token-from-dashboard',
-    agent_id: 'my-copilot'
-  }));
-});
-```
-
-For remote agents, use a [tunnel](tunnels.md) and connect via `wss://your-tunnel-url/`.
+React 19, TanStack Router, TanStack Query, Vite, vanilla CSS, DM Sans font.

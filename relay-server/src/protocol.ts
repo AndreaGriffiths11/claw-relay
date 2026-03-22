@@ -14,6 +14,7 @@ export interface ActionMessage {
   js?: string;
   key?: string;
   values?: string[];
+  request_id?: string;
 }
 
 export interface ResultMessage {
@@ -21,21 +22,28 @@ export interface ResultMessage {
   action: string;
   ok: boolean;
   data?: string;
+  request_id?: string;
 }
 
 export interface ErrorMessage {
   type: 'error';
   code: string;
   message: string;
+  request_id?: string;
 }
 
-export type IncomingMessage = AuthMessage | ActionMessage;
-export type OutgoingMessage = ResultMessage | ErrorMessage;
+export type IncomingMessage = AuthMessage | ActionMessage | { type: 'pong' };
+export type OutgoingMessage = ResultMessage | ErrorMessage | { type: 'ping' };
+
+const VALID_TYPES = new Set(['auth', 'snapshot', 'click', 'fill', 'navigate', 'screenshot', 'evaluate', 'press', 'hover', 'select', 'type', 'close', 'pong']);
 
 export function parseMessage(raw: string): IncomingMessage | null {
   try {
     const msg = JSON.parse(raw);
-    if (!msg || !msg.type) return null;
+    const hasValidStructure = msg && typeof msg.type === 'string';
+    if (!hasValidStructure) return null;
+    const isKnownType = VALID_TYPES.has(msg.type);
+    if (!isKnownType) return null;
     return msg as IncomingMessage;
   } catch {
     return null;
@@ -43,10 +51,30 @@ export function parseMessage(raw: string): IncomingMessage | null {
 }
 
 export function isAuthMessage(msg: IncomingMessage): msg is AuthMessage {
-  return msg.type === 'auth' && 'token' in msg && 'agent_id' in msg;
+  const isAuthType = msg.type === 'auth';
+  const hasToken = typeof (msg as any).token === 'string';
+  const hasAgentId = typeof (msg as any).agent_id === 'string';
+  return isAuthType && hasToken && hasAgentId;
 }
 
+const ACTIONS = new Set(['snapshot', 'click', 'fill', 'navigate', 'screenshot', 'evaluate', 'press', 'hover', 'select', 'type', 'close']);
+
+// Required fields per action
+const REQUIRED_FIELDS: Record<string, string[]> = {
+  click: ['ref'], hover: ['ref'], fill: ['ref', 'text'], type: ['ref', 'text'],
+  navigate: ['url'], evaluate: ['js'], press: ['key'], select: ['ref'],
+};
+
 export function isActionMessage(msg: IncomingMessage): msg is ActionMessage {
-  const actions = ['snapshot', 'click', 'fill', 'navigate', 'screenshot', 'evaluate', 'press', 'hover', 'select', 'type', 'close'];
-  return actions.includes(msg.type);
+  const isValidAction = ACTIONS.has(msg.type);
+  if (!isValidAction) return false;
+  const required = REQUIRED_FIELDS[msg.type];
+  if (required) {
+    for (const field of required) {
+      const fieldExists = field in msg;
+      const fieldIsString = typeof (msg as any)[field] === 'string';
+      if (!fieldExists || !fieldIsString) return false;
+    }
+  }
+  return true;
 }

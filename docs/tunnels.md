@@ -1,10 +1,12 @@
 # Remote Access (Tunneling)
 
-The relay runs on your machine. Tunnels make it reachable by remote agents.
+The relay runs on your machine. If your agent is on the **same machine**, just use `ws://localhost:9333` — no tunnel needed.
 
-## Option A: Cloudflare Quick Tunnel (easiest)
+Tunnels make the relay reachable by **remote** agents.
 
-No account needed.
+## Option A: Cloudflare Quick Tunnel (easiest, temporary)
+
+No account needed. Good for testing.
 
 ```bash
 brew install cloudflared
@@ -13,13 +15,35 @@ cloudflared tunnel --url http://localhost:9333
 
 You'll get a URL like `https://random-words.trycloudflare.com`. Connect via `wss://random-words.trycloudflare.com/`.
 
-> Quick tunnels are temporary — the URL changes on restart. For persistent URLs, set up a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps).
+> Quick tunnels are temporary — the URL changes on restart.
 
-## Option B: Tailscale
+## Option B: Cloudflare Named Tunnel (permanent URL — recommended)
+
+One-time setup. URL never changes.
+
+```bash
+# 1. Authenticate with Cloudflare
+cloudflared tunnel login
+
+# 2. Create the tunnel
+cloudflared tunnel create claw-relay
+
+# 3. Route a subdomain to it
+cloudflared tunnel route dns claw-relay relay.yourdomain.com
+
+# 4. Run it
+cloudflared tunnel run --url http://localhost:9333 claw-relay
+```
+
+Your relay is now permanently at `wss://relay.yourdomain.com/`. Use this URL in your MCP config and agent connections — it never changes across restarts.
+
+Requires a domain on Cloudflare (free plan works).
+
+## Option C: Tailscale
 
 If both machines are on the same tailnet, connect directly: `ws://<tailscale-ip>:9333`.
 
-## Option C: ngrok
+## Option D: ngrok
 
 ```bash
 ngrok http 9333
