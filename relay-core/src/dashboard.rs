@@ -95,6 +95,7 @@ async fn get_agents_handler(
     Ok(Json(serde_json::json!(agents)))
 }
 
+#[derive(Deserialize)]
 struct CreateAgentBody {
     id: String,
     token: String,
@@ -143,6 +144,7 @@ async fn create_agent_handler(
     Ok((StatusCode::CREATED, Json(serde_json::json!({"ok": true}))))
 }
 
+#[derive(Deserialize)]
 struct UpdateAgentBody {
     token: Option<String>,
     scopes: Option<Vec<String>>,
