@@ -53,15 +53,15 @@ impl AppState {
     fn cleanup_stale_rate_limits(&self) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system clock before UNIX epoch")
             .as_millis() as u64;
         let stale_threshold = 5 * 60 * 1000; // 5 minutes in ms
-        let mut buckets = self.rate_limits.write().unwrap();
+        let mut buckets = self.rate_limits.write().expect("lock poisoned");
         buckets.retain(|_, bucket| now - bucket.last_reset < stale_threshold);
     }
 
     pub fn agent_connected(&self, agent_id: &str) {
-        let mut conns = self.connections.write().unwrap();
+        let mut conns = self.connections.write().expect("lock poisoned");
         conns.insert(agent_id.to_string(), AgentState {
             agent_id: agent_id.to_string(),
             connected_at: chrono::Utc::now().to_rfc3339(),
@@ -72,12 +72,12 @@ impl AppState {
     }
 
     pub fn agent_disconnected(&self, agent_id: &str) {
-        let mut conns = self.connections.write().unwrap();
+        let mut conns = self.connections.write().expect("lock poisoned");
         conns.remove(agent_id);
     }
 
     pub fn agent_action(&self, agent_id: &str, action: &str) {
-        let mut conns = self.connections.write().unwrap();
+        let mut conns = self.connections.write().expect("lock poisoned");
         if let Some(state) = conns.get_mut(agent_id) {
             state.last_action = Some(action.to_string());
             state.last_action_at = Some(chrono::Utc::now().to_rfc3339());
@@ -88,9 +88,9 @@ impl AppState {
     pub fn check_rate_limit(&self, agent_id: &str, limit: u32) -> bool {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system clock before UNIX epoch")
             .as_millis() as u64;
-        let mut buckets = self.rate_limits.write().unwrap();
+        let mut buckets = self.rate_limits.write().expect("lock poisoned");
         let bucket = buckets.entry(agent_id.to_string()).or_insert(RateBucket {
             count: 0,
             last_reset: now,
@@ -107,6 +107,6 @@ impl AppState {
     }
 
     pub fn is_agent_connected(&self, agent_id: &str) -> bool {
-        self.connections.read().unwrap().contains_key(agent_id)
+        self.connections.read().expect("lock poisoned").contains_key(agent_id)
     }
 }

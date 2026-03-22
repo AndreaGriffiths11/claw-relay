@@ -60,7 +60,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         let token = parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
         let aid = parsed.get("agent_id").and_then(|v| v.as_str()).unwrap_or("");
 
-        let config = state.config.read().unwrap().clone();
+        let config = state.config.read().expect("lock poisoned").clone();
         match authenticate(&config, token, aid) {
             None => {
                 let _ = sender.send(Message::Text(serde_json::json!({
@@ -199,7 +199,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         }
 
         // URL allowlist/blocklist check for navigate
-        let config = state.config.read().unwrap().clone();
+        let config = state.config.read().expect("lock poisoned").clone();
         if action == "navigate" {
             if let Some(url) = parsed.get("url").and_then(|v| v.as_str()) {
                 let check = is_allowed(url, &cfg.allowlist, &config.blocklist);

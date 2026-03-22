@@ -4,8 +4,41 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as YAML from 'yaml';
+import { Context } from 'hono';
+import type { MiddlewareHandler, Next } from 'hono/types';
 import { Config, AgentConfig, loadConfig } from './auth';
 import { AgentState } from './state';
+import { tailLines } from './audit-logger';
+
+/** Shape of the request body for agent CRUD operations */
+interface AgentRequestBody {
+  id?: string;
+  token?: string;
+  scopes?: string[];
+  allowlist?: string[];
+  rateLimit?: number;
+}
+
+/** A single audit log entry (parsed from JSONL) */
+interface AuditEntry {
+  agent_id?: string;
+  action?: string;
+  ok?: boolean;
+  duration_ms?: number;
+  error?: string;
+  target?: string;
+  timestamp?: string;
+}
+
+/** Config data written to YAML (mirrors Config but used for serialization) */
+interface ConfigData {
+  server: Config['server'];
+  agents: Config['agents'];
+  blocklist: Config['blocklist'];
+  audit: Config['audit'];
+  engine: Config['engine'];
+  dashboard: Config['dashboard'];
+}
 
 type GetStateFn = () => { connections: AgentState[]; startedAt: string };
 
@@ -31,24 +64,17 @@ function redactToken(token: string): string {
   return '****' + lastFourChars;
 }
 
-function readAuditLog(config: Config): any[] {
+function readAuditLog(config: Config, limit: number = 200): AuditEntry[] {
   const logFile = config.audit.logFile;
   const isAbsolute = path.isAbsolute(logFile);
   const absPath = isAbsolute ? logFile : path.join(process.cwd(), logFile);
-  try {
-    const content = fs.readFileSync(absPath, 'utf-8');
-    const allLines = content.trim().split('\n').filter(Boolean);
-    const recentLines = allLines.slice(-100);
-    const parsedEntries = recentLines.map(l => { try { return JSON.parse(l); } catch { return null; } });
-    const validEntries = parsedEntries.filter(Boolean);
-    return validEntries;
-  } catch {
-    return [];
-  }
+  const lines = tailLines(absPath, limit);
+  const parsedEntries = lines.map(l => { try { return JSON.parse(l); } catch { return null; } });
+  return parsedEntries.filter(Boolean) as AuditEntry[];
 }
 
 function writeConfigAtomic(configPath: string, config: Config): void {
-  const data: any = {
+  const data: ConfigData = {
     server: config.server,
     agents: config.agents,
     blocklist: config.blocklist,
@@ -66,7 +92,7 @@ function writeConfigAtomic(configPath: string, config: Config): void {
 const VALID_SCOPES = ['navigate', 'read', 'interact', 'execute'];
 const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-function validateAgentFields(body: any, requireIdToken: boolean): string | null {
+function validateAgentFields(body: AgentRequestBody, requireIdToken: boolean): string | null {
   if (requireIdToken) {
     const idIsString = typeof body.id === 'string';
     const idMatchesPattern = idIsString && AGENT_ID_RE.test(body.id);
@@ -86,13 +112,13 @@ function validateAgentFields(body: any, requireIdToken: boolean): string | null 
   }
   if (body.scopes !== undefined) {
     const scopesIsArray = Array.isArray(body.scopes);
-    const allScopesValid = scopesIsArray && body.scopes.every((s: any) => typeof s === 'string' && VALID_SCOPES.includes(s));
+    const allScopesValid = scopesIsArray && body.scopes!.every((s: string) => typeof s === 'string' && VALID_SCOPES.includes(s));
     if (!allScopesValid)
       return 'scopes must be an array of: ' + VALID_SCOPES.join(', ');
   }
   if (body.allowlist !== undefined) {
     const allowlistIsArray = Array.isArray(body.allowlist);
-    const allStrings = allowlistIsArray && body.allowlist.every((s: any) => typeof s === 'string');
+    const allStrings = allowlistIsArray && body.allowlist!.every((s: string) => typeof s === 'string');
     if (!allStrings)
       return 'allowlist must be an array of strings';
   }
@@ -157,7 +183,7 @@ export function startDashboard(
   });
 
   // Auth middleware for API routes
-  const requireAuth = (c: any, next: any) => {
+  const requireAuth: MiddlewareHandler = (c: Context, next: Next) => {
     if (!config.dashboard.adminToken) {
       return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
     }
@@ -171,7 +197,7 @@ export function startDashboard(
   app.use('/api/*', requireAuth);
 
   app.get('/api/config', (c) => {
-    const redacted: Record<string, any> = {};
+    const redacted: Record<string, Omit<AgentConfig, 'token'> & { token: string }> = {};
     for (const [id, agent] of Object.entries(config.agents)) {
       redacted[id] = { ...agent, token: redactToken(agent.token) };
     }
@@ -184,7 +210,9 @@ export function startDashboard(
   });
 
   app.get('/api/audit', (c) => {
-    const entries = readAuditLog(config);
+    const limitParam = c.req.query('limit');
+    const limit = limitParam ? Math.max(1, Math.min(10000, parseInt(limitParam, 10) || 200)) : 200;
+    const entries = readAuditLog(config, limit);
     return c.json({ entries });
   });
 
