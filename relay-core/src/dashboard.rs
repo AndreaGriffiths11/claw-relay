@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{Json, Response},
     routing::{get, put},
@@ -15,15 +15,8 @@ use crate::config::{redact_token, write_config_atomic, AgentConfig};
 use crate::permissions::VALID_SCOPES;
 use crate::state::AppState;
 
-#[derive(Deserialize)]
-struct TokenQuery {
-    token: Option<String>,
-}
 
-fn get_token(query: &Query<TokenQuery>, headers: &HeaderMap) -> Option<String> {
-    if let Some(t) = &query.token {
-        return Some(t.clone());
-    }
+fn get_token(headers: &HeaderMap) -> Option<String> {
     if let Some(auth) = headers.get("authorization") {
         if let Ok(val) = auth.to_str() {
             if let Some(token) = val.strip_prefix("Bearer ") {
@@ -34,12 +27,12 @@ fn get_token(query: &Query<TokenQuery>, headers: &HeaderMap) -> Option<String> {
     None
 }
 
-fn check_auth(state: &AppState, query: &Query<TokenQuery>, headers: &HeaderMap) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+fn check_auth(state: &AppState, headers: &HeaderMap) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
     let config = state.config.read().unwrap();
     if config.dashboard.admin_token.is_empty() {
         return Err((StatusCode::FORBIDDEN, Json(serde_json::json!({"error": "Dashboard disabled: no adminToken configured"}))));
     }
-    match get_token(query, headers) {
+    match get_token(headers) {
         None => Err((StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": "Unauthorized"})))),
         Some(t) => {
             if check_admin_auth(&config.dashboard.admin_token, &t) {
@@ -57,10 +50,9 @@ async fn health_handler() -> Json<serde_json::Value> {
 
 async fn status_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     let conns = state.connections.read().unwrap();
     let config = state.config.read().unwrap();
     
@@ -87,10 +79,9 @@ async fn status_handler(
 
 async fn get_agents_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     let config = state.config.read().unwrap();
     let mut agents: HashMap<String, serde_json::Value> = HashMap::new();
     for (id, agent) in &config.agents {
@@ -104,7 +95,6 @@ async fn get_agents_handler(
     Ok(Json(serde_json::json!(agents)))
 }
 
-#[derive(Deserialize)]
 struct CreateAgentBody {
     id: String,
     token: String,
@@ -120,11 +110,10 @@ fn validate_agent_id(id: &str) -> bool {
 
 async fn create_agent_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
     Json(body): Json<CreateAgentBody>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     
     if !validate_agent_id(&body.id) {
         return Err((StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "id must be alphanumeric/hyphens/underscores, 1-64 chars"}))));
@@ -154,7 +143,6 @@ async fn create_agent_handler(
     Ok((StatusCode::CREATED, Json(serde_json::json!({"ok": true}))))
 }
 
-#[derive(Deserialize)]
 struct UpdateAgentBody {
     token: Option<String>,
     scopes: Option<Vec<String>>,
@@ -166,11 +154,10 @@ struct UpdateAgentBody {
 async fn update_agent_handler(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
     Json(body): Json<UpdateAgentBody>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     
     let mut config = state.config.write().unwrap();
     let agent = config.agents.get_mut(&id)
@@ -198,10 +185,9 @@ async fn update_agent_handler(
 async fn delete_agent_handler(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     
     let mut config = state.config.write().unwrap();
     if config.agents.remove(&id).is_none() {
@@ -213,30 +199,27 @@ async fn delete_agent_handler(
 
 async fn get_audit_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     let entries = state.audit.read_from_file();
     Ok(Json(serde_json::json!({"entries": entries})))
 }
 
 async fn clear_audit_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     state.audit.clear();
     Ok(Json(serde_json::json!({"ok": true})))
 }
 
 async fn download_audit_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     let entries = state.audit.read_from_file();
     let json = serde_json::to_string_pretty(&entries).unwrap_or_default();
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
@@ -249,10 +232,9 @@ async fn download_audit_handler(
 
 async fn get_config_handler(
     State(state): State<Arc<AppState>>,
-    Query(q): Query<TokenQuery>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    check_auth(&state, &Query(q), &headers)?;
+    check_auth(&state, &headers)?;
     let config = state.config.read().unwrap();
     let mut redacted: HashMap<String, serde_json::Value> = HashMap::new();
     for (id, agent) in &config.agents {

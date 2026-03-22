@@ -24,19 +24,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// Extract admin token from query string or Authorization header
-pub fn extract_admin_token(query: Option<&str>, headers: &axum::http::HeaderMap) -> Option<String> {
-    // Check query param
-    if let Some(q) = query {
-        for pair in q.split('&') {
-            let mut parts = pair.splitn(2, '=');
-            if let (Some(key), Some(val)) = (parts.next(), parts.next()) {
-                if key == "token" {
-                    return Some(val.to_string());
-                }
-            }
-        }
-    }
-    // Check Authorization header
+pub fn extract_admin_token(headers: &axum::http::HeaderMap) -> Option<String> {
     if let Some(auth) = headers.get("authorization") {
         if let Ok(val) = auth.to_str() {
             if let Some(token) = val.strip_prefix("Bearer ") {
