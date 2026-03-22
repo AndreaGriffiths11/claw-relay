@@ -23,6 +23,7 @@ export interface ResultMessage {
   ok: boolean;
   data?: string;
   request_id?: string;
+  mimeType?: string;
 }
 
 export interface ErrorMessage {
