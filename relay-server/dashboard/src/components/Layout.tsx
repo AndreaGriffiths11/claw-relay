@@ -11,7 +11,20 @@ export function Layout() {
 
   useEffect(() => {
     if (getToken()) {
-      api('/api/status').then(() => setAuthed(true)).catch(() => setAuthed(false));
+      api('/api/status')
+        .then(() => setAuthed(true))
+        .catch((err) => {
+          // Only clear token on auth failures, not network/transient errors
+          if (err.message.includes('401') || err.message.includes('403') || err.message === 'Unauthorized') {
+            clearToken();
+            setAuthed(false);
+            setError('Invalid token');
+          } else {
+            // Server may be down — keep token, show connection error
+            setAuthed(false);
+            setError('Could not reach server');
+          }
+        });
     }
   }, []);
 
@@ -24,10 +37,10 @@ export function Layout() {
       await api('/api/status');
       setAuthed(true);
       setTokenInput('');
-    } catch {
+    } catch (err: any) {
       clearToken();
       setAuthed(false);
-      setError('Invalid token');
+      setError(err.message.includes('401') || err.message.includes('403') ? 'Invalid token' : 'Could not reach server');
     }
   };
 
