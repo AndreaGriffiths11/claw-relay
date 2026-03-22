@@ -10,7 +10,7 @@ pub struct ServerConfig {
     pub host: String,
 }
 
-fn default_port() -> u16 { 9222 }
+fn default_port() -> u16 { 9333 }
 fn default_host() -> String { "127.0.0.1".to_string() }
 
 impl Default for ServerConfig {

@@ -307,7 +307,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 pub async fn start_dashboard(state: Arc<AppState>) {
     let port = state.config.read().unwrap().dashboard.port;
     let router = create_router(state);
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
         .await
         .expect("Failed to bind dashboard port");
     tracing::info!("Dashboard running on http://localhost:{}", port);

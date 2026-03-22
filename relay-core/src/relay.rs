@@ -29,11 +29,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let mut agent_id: Option<String> = None;
     let mut agent_config: Option<AgentConfig> = None;
 
+    // Phase 1: Authentication
     while let Some(msg) = receiver.next().await {
         let msg = match msg {
             Ok(Message::Text(t)) => t,
-            Ok(Message::Close(_)) => break,
-            Err(_) => break,
+            Ok(Message::Close(_)) => return,
+            Err(_) => return,
             _ => continue,
         };
 
@@ -49,54 +50,114 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
         let msg_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-        if !authenticated {
-            if msg_type != "auth" {
-                let _ = sender.send(Message::Text(serde_json::json!({
-                    "type": "error", "code": "not_authenticated", "message": "Send auth message first"
-                }).to_string().into())).await;
-                continue;
-            }
-
-            let token = parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
-            let aid = parsed.get("agent_id").and_then(|v| v.as_str()).unwrap_or("");
-
-            let config = state.config.read().unwrap().clone();
-            match authenticate(&config, token, aid) {
-                None => {
-                    let _ = sender.send(Message::Text(serde_json::json!({
-                        "type": "error", "code": "auth_failed", "message": "Invalid token or agent_id"
-                    }).to_string().into())).await;
-                    break;
-                }
-                Some(cfg) => {
-                    // Check duplicate
-                    if state.is_agent_connected(aid) {
-                        let _ = sender.send(Message::Text(serde_json::json!({
-                            "type": "error", "code": "duplicate_agent", "message": "Agent ID already connected"
-                        }).to_string().into())).await;
-                        break;
-                    }
-                    authenticated = true;
-                    agent_id = Some(aid.to_string());
-                    agent_config = Some(cfg);
-                    state.agent_connected(aid);
-                    let _ = sender.send(Message::Text(serde_json::json!({
-                        "type": "result", "action": "auth", "ok": true
-                    }).to_string().into())).await;
-                }
-            }
+        if msg_type != "auth" {
+            let _ = sender.send(Message::Text(serde_json::json!({
+                "type": "error", "code": "not_authenticated", "message": "Send auth message first"
+            }).to_string().into())).await;
             continue;
         }
 
-        // Action handling
-        let aid = agent_id.as_ref().unwrap();
-        let cfg = agent_config.as_ref().unwrap();
+        let token = parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
+        let aid = parsed.get("agent_id").and_then(|v| v.as_str()).unwrap_or("");
+
+        let config = state.config.read().unwrap().clone();
+        match authenticate(&config, token, aid) {
+            None => {
+                let _ = sender.send(Message::Text(serde_json::json!({
+                    "type": "error", "code": "auth_failed", "message": "Invalid token or agent_id"
+                }).to_string().into())).await;
+                return;
+            }
+            Some(cfg) => {
+                if state.is_agent_connected(aid) {
+                    let _ = sender.send(Message::Text(serde_json::json!({
+                        "type": "error", "code": "duplicate_agent", "message": "Agent ID already connected"
+                    }).to_string().into())).await;
+                    return;
+                }
+                authenticated = true;
+                agent_id = Some(aid.to_string());
+                agent_config = Some(cfg);
+                state.agent_connected(aid);
+                let _ = sender.send(Message::Text(serde_json::json!({
+                    "type": "result", "action": "auth", "ok": true
+                }).to_string().into())).await;
+                break;
+            }
+        }
+    }
+
+    if !authenticated {
+        return;
+    }
+
+    let aid = agent_id.clone().unwrap();
+    let cfg = agent_config.unwrap();
+
+    // Heartbeat: wrap sender in Arc<Mutex> for sharing with ping task
+    let sender = Arc::new(tokio::sync::Mutex::new(sender));
+    let last_pong = Arc::new(tokio::sync::Mutex::new(std::time::Instant::now()));
+
+    // Spawn ping loop
+    let ping_sender = sender.clone();
+    let ping_pong = last_pong.clone();
+    let ping_aid = aid.clone();
+    let ping_handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            let elapsed = ping_pong.lock().await.elapsed();
+            if elapsed > std::time::Duration::from_secs(90) {
+                tracing::warn!("Agent {} heartbeat timeout, disconnecting", ping_aid);
+                let mut s = ping_sender.lock().await;
+                let _ = s.close().await;
+                break;
+            }
+            let mut s = ping_sender.lock().await;
+            if s.send(Message::Text(
+                serde_json::json!({"type":"ping"}).to_string().into()
+            )).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Phase 2: Action loop
+    while let Some(msg) = receiver.next().await {
+        let msg = match msg {
+            Ok(Message::Text(t)) => t,
+            Ok(Message::Close(_)) => break,
+            Err(_) => break,
+            _ => continue,
+        };
+
+        let parsed: serde_json::Value = match serde_json::from_str(&msg) {
+            Ok(v) => v,
+            Err(_) => {
+                let mut s = sender.lock().await;
+                let _ = s.send(Message::Text(serde_json::json!({
+                    "type": "error", "code": "invalid_message", "message": "Could not parse message"
+                }).to_string().into())).await;
+                continue;
+            }
+        };
+
+        let msg_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let req_id = parsed.get("request_id").cloned();
+
+        // Handle pong
+        if msg_type == "pong" {
+            *last_pong.lock().await = std::time::Instant::now();
+            continue;
+        }
+
         let action = msg_type;
 
         let valid_actions = ["snapshot", "screenshot", "click", "type", "fill", "navigate", 
                             "press", "hover", "select", "evaluate", "close"];
         if !valid_actions.contains(&action) {
-            let _ = sender.send(Message::Text(serde_json::json!({
+            let mut s = sender.lock().await;
+            let _ = s.send(Message::Text(serde_json::json!({
                 "type": "error", "code": "invalid_action", "message": "Unknown action type"
             }).to_string().into())).await;
             continue;
@@ -104,10 +165,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
         // Permission check
         if !has_permission(&cfg.scopes, action) {
-            let _ = sender.send(Message::Text(serde_json::json!({
+            let mut resp = serde_json::json!({
                 "type": "error", "code": "permission_denied", 
                 "message": format!("Agent lacks required scope for '{}'", action)
-            }).to_string().into())).await;
+            });
+            if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+            let mut s = sender.lock().await;
+            let _ = s.send(Message::Text(resp.to_string().into())).await;
             state.audit.log(AuditEntry {
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 agent_id: aid.clone(), action: action.to_string(),
@@ -118,10 +182,13 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         }
 
         // Rate limit
-        if !state.check_rate_limit(aid, cfg.rate_limit) {
-            let _ = sender.send(Message::Text(serde_json::json!({
+        if !state.check_rate_limit(&aid, cfg.rate_limit) {
+            let mut resp = serde_json::json!({
                 "type": "error", "code": "rate_limited", "message": "Rate limit exceeded"
-            }).to_string().into())).await;
+            });
+            if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+            let mut s = sender.lock().await;
+            let _ = s.send(Message::Text(resp.to_string().into())).await;
             state.audit.log(AuditEntry {
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 agent_id: aid.clone(), action: action.to_string(),
@@ -131,16 +198,19 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             continue;
         }
 
-        // URL allowlist check
+        // URL allowlist/blocklist check for navigate
         let config = state.config.read().unwrap().clone();
         if action == "navigate" {
             if let Some(url) = parsed.get("url").and_then(|v| v.as_str()) {
                 let check = is_allowed(url, &cfg.allowlist, &config.blocklist);
                 if !check.allowed {
                     let reason = check.reason.unwrap_or_else(|| "Site blocked".to_string());
-                    let _ = sender.send(Message::Text(serde_json::json!({
+                    let mut resp = serde_json::json!({
                         "type": "error", "code": "site_blocked", "message": reason
-                    }).to_string().into())).await;
+                    });
+                    if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+                    let mut s = sender.lock().await;
+                    let _ = s.send(Message::Text(resp.to_string().into())).await;
                     state.audit.log(AuditEntry {
                         timestamp: chrono::Utc::now().to_rfc3339(),
                         agent_id: aid.clone(), action: action.to_string(),
@@ -150,6 +220,30 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     continue;
                 }
             }
+        } else if action != "close" {
+            // Feature 4: Check current page URL against blocklist for non-navigate, non-close actions
+            // TODO: Need engine support for "current-url" command to get the active page URL
+            // When available, uncomment and use:
+            // let url_result = execute_engine(&config.engine.binary, &["current-url".to_string()], config.engine.timeout).await;
+            // if let Ok(current_url) = url_result {
+            //     let check = is_allowed(&current_url, &cfg.allowlist, &config.blocklist);
+            //     if !check.allowed {
+            //         let reason = check.reason.unwrap_or_else(|| "Current site is blocked".to_string());
+            //         let mut resp = serde_json::json!({
+            //             "type": "error", "code": "site_blocked", "message": reason
+            //         });
+            //         if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+            //         let mut s = sender.lock().await;
+            //         let _ = s.send(Message::Text(resp.to_string().into())).await;
+            //         state.audit.log(AuditEntry {
+            //             timestamp: chrono::Utc::now().to_rfc3339(),
+            //             agent_id: aid.clone(), action: action.to_string(),
+            //             target: Some(current_url), ok: false, duration_ms: 0,
+            //             error: Some("site_blocked".to_string()),
+            //         });
+            //         continue;
+            //     }
+            // }
         }
 
         // Execute via engine
@@ -163,7 +257,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             .or_else(|| parsed.get("key").and_then(|v| v.as_str()))
             .map(|s| s.to_string());
 
-        state.agent_action(aid, action);
+        state.agent_action(&aid, action);
         
         match result {
             Ok(data) => {
@@ -172,11 +266,40 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     agent_id: aid.clone(), action: action.to_string(),
                     target, ok: true, duration_ms: duration, error: None,
                 });
+
+                // Screenshot tunneling: read the file and send as base64
+                if action == "screenshot" && !data.is_empty() {
+                    let path_re = regex::Regex::new(r"/\S+\.png").unwrap();
+                    if let Some(m) = path_re.find(&data) {
+                        let screenshot_path = m.as_str();
+                        match tokio::fs::read(screenshot_path).await {
+                            Ok(bytes) => {
+                                use base64::Engine as _;
+                                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                                let mut resp = serde_json::json!({
+                                    "type": "result", "action": "screenshot", "ok": true,
+                                    "data": b64, "mimeType": "image/png"
+                                });
+                                if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+                                let mut s = sender.lock().await;
+                                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                                continue;
+                            }
+                            Err(e) => {
+                                eprintln!("Screenshot tunnel error: {} (path: {})", e, screenshot_path);
+                                // Fall through to normal response
+                            }
+                        }
+                    }
+                }
+
                 let mut resp = serde_json::json!({"type": "result", "action": action, "ok": true});
                 if !data.is_empty() {
                     resp["data"] = serde_json::Value::String(data);
                 }
-                let _ = sender.send(Message::Text(resp.to_string().into())).await;
+                if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+                let mut s = sender.lock().await;
+                let _ = s.send(Message::Text(resp.to_string().into())).await;
             }
             Err(e) => {
                 state.audit.log(AuditEntry {
@@ -185,18 +308,20 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     target, ok: false, duration_ms: duration,
                     error: Some(e.clone()),
                 });
-                let _ = sender.send(Message::Text(serde_json::json!({
+                let mut resp = serde_json::json!({
                     "type": "error", "code": "engine_error", "message": e
-                }).to_string().into())).await;
+                });
+                if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+                let mut s = sender.lock().await;
+                let _ = s.send(Message::Text(resp.to_string().into())).await;
             }
         }
     }
 
     // Cleanup
-    if let Some(aid) = &agent_id {
-        state.agent_disconnected(aid);
-        tracing::info!("Agent {} disconnected", aid);
-    }
+    ping_handle.abort();
+    state.agent_disconnected(&aid);
+    tracing::info!("Agent {} disconnected", aid);
 }
 
 fn build_engine_args(action: &str, msg: &serde_json::Value) -> Vec<String> {
