@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useRouterState } from '@tanstack/react-router';
-import { getToken, setToken, api } from '../api';
+import { getToken, setToken, clearToken, api } from '../api';
 
 export function Layout() {
   const [authed, setAuthed] = useState(!!getToken());
@@ -18,12 +18,14 @@ export function Layout() {
   const handleAuth = async () => {
     const t = tokenInput.trim();
     if (!t) return;
+    setError('');
     setToken(t);
     try {
       await api('/api/status');
       setAuthed(true);
-      setError('');
+      setTokenInput('');
     } catch {
+      clearToken();
       setAuthed(false);
       setError('Invalid token');
     }
