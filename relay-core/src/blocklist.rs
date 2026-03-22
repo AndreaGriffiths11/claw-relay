@@ -62,4 +62,54 @@ mod tests {
         assert!(matches_pattern("example.com", "example.com"));
         assert!(!matches_pattern("example.com", "other.com"));
     }
+
+    #[test]
+    fn test_extract_hostname() {
+        assert_eq!(extract_hostname("https://example.com/path"), Some("example.com".to_string()));
+        assert_eq!(extract_hostname("http://USER@host.com:8080/path"), Some("host.com".to_string()));
+        assert_eq!(extract_hostname("https://UPPER.COM"), Some("upper.com".to_string()));
+        assert_eq!(extract_hostname("no-scheme"), None);
+    }
+
+    #[test]
+    fn test_is_allowed_blocklist() {
+        let result = is_allowed("https://evil.com", &[], &["evil.com".to_string()]);
+        assert!(!result.allowed);
+    }
+
+    #[test]
+    fn test_is_allowed_wildcard_blocklist() {
+        let result = is_allowed("https://sub.evil.com", &[], &["*.evil.com".to_string()]);
+        assert!(!result.allowed);
+    }
+
+    #[test]
+    fn test_is_allowed_empty_allowlist_passes() {
+        let result = is_allowed("https://anything.com", &[], &[]);
+        assert!(result.allowed);
+    }
+
+    #[test]
+    fn test_is_allowed_allowlist_match() {
+        let result = is_allowed("https://good.com", &["good.com".to_string()], &[]);
+        assert!(result.allowed);
+    }
+
+    #[test]
+    fn test_is_allowed_allowlist_no_match() {
+        let result = is_allowed("https://bad.com", &["good.com".to_string()], &[]);
+        assert!(!result.allowed);
+    }
+
+    #[test]
+    fn test_is_allowed_blocklist_takes_priority() {
+        let result = is_allowed("https://evil.com", &["*".to_string()], &["evil.com".to_string()]);
+        assert!(!result.allowed);
+    }
+
+    #[test]
+    fn test_is_allowed_invalid_url() {
+        let result = is_allowed("not-a-url", &[], &[]);
+        assert!(!result.allowed);
+    }
 }
