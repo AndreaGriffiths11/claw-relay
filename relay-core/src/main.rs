@@ -14,12 +14,11 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("claw_relay_core=info".parse().unwrap()),
+                .add_directive("claw_relay_core=info".parse().expect("static log directive must be valid")),
         )
         .init();
 
     let config_path = std::env::args().nth(1).unwrap_or_else(|| {
-        // Look for config.yaml in parent directory (relay-server/)
         let default = "../relay-server/config.yaml";
         if std::path::Path::new(default).exists() {
             default.to_string()
@@ -46,24 +45,55 @@ async fn main() {
     let ws_state = Arc::clone(&state);
     let dash_state = Arc::clone(&state);
 
-    let ws_handle = tokio::spawn(async move {
-        let router = relay::create_ws_router(ws_state);
-        let listener = tokio::net::TcpListener::bind(format!("{}:{}", ws_host, ws_port))
-            .await
-            .expect("Failed to bind WebSocket port");
-        tracing::info!("Claw Relay server listening on {}:{}", ws_host, ws_port);
-        axum::serve(listener, router).await.expect("WebSocket server error");
-    });
+    let ws_router = relay::create_ws_router(ws_state);
+    let ws_listener = tokio::net::TcpListener::bind(format!("{}:{}", ws_host, ws_port))
+        .await
+        .expect("Failed to bind WebSocket port");
+    tracing::info!("Claw Relay server listening on {}:{}", ws_host, ws_port);
 
-    let dash_handle = tokio::spawn(async move {
-        dashboard::start_dashboard(dash_state).await;
-    });
+    let dash_port = state.config.read().expect("config lock poisoned").dashboard.port;
+    let dash_router = dashboard::create_router(dash_state);
+    let dash_listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", dash_port))
+        .await
+        .expect("Failed to bind dashboard port");
+    tracing::info!("Dashboard running on http://localhost:{}", dash_port);
+
+    // Graceful shutdown signal
+    let shutdown = async {
+        let ctrl_c = tokio::signal::ctrl_c();
+        #[cfg(unix)]
+        {
+            let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("failed to register SIGTERM handler");
+            tokio::select! {
+                _ = ctrl_c => {},
+                _ = sigterm.recv() => {},
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            ctrl_c.await.ok();
+        }
+        tracing::info!("Shutdown signal received, closing connections...");
+    };
+
+    let shutdown_state = Arc::clone(&state);
 
     tokio::select! {
-        _ = ws_handle => {},
-        _ = dash_handle => {},
-        _ = tokio::signal::ctrl_c() => {
-            tracing::info!("Shutting down gracefully...");
+        res = axum::serve(ws_listener, ws_router).with_graceful_shutdown(shutdown) => {
+            if let Err(e) = res { tracing::error!("WebSocket server error: {}", e); }
+        }
+        res = axum::serve(dash_listener, dash_router) => {
+            if let Err(e) = res { tracing::error!("Dashboard server error: {}", e); }
         }
     }
+
+    // On shutdown, log connected agents and clean up
+    let conns = shutdown_state.connections.read().expect("connections lock poisoned");
+    if !conns.is_empty() {
+        let agent_ids: Vec<&str> = conns.keys().map(|s| s.as_str()).collect();
+        tracing::info!("Closing connections for agents: {:?}", agent_ids);
+    }
+    drop(conns);
+    tracing::info!("Claw Relay shut down cleanly");
 }
