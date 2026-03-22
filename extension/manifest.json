@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Claw Relay",
+  "name": "Claw Relay™",
   "version": "0.3.0",
   "description": "Status dashboard for Claw Relay — AI agent browser control",
   "permissions": [

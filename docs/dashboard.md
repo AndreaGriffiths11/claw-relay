@@ -1,6 +1,6 @@
 # Dashboard
 
-Claw Relay includes a built-in dashboard for managing agents, viewing live connections, and browsing the audit log.
+Claw Relay™ includes a built-in dashboard for managing agents, viewing live connections, and browsing the audit log.
 
 ## Access
 
