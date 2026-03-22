@@ -24,6 +24,15 @@ cp relay-server/config.example.yaml relay-server/config.yaml  # edit with your a
 
 If you prefer to set things up step by step.
 
+### Why Bun and Rust?
+
+Claw Relay has two runtimes — use whichever fits your setup:
+
+- **Bun (TypeScript)** — The full-featured server. Auth, permissions, dashboard, audit logging, WebSocket relay. This is what `start.sh` runs. Use this unless you have a reason not to.
+- **Rust** — A lightweight CDP bridge from the original [agent-browser](https://github.com/vercel-labs/agent-browser) fork. Single binary, no runtime deps. Handles the low-level Chrome communication. Optional — Bun talks to Chrome directly via agent-browser.
+
+Most users only need Bun. The Rust binary is there for environments where you want a single compiled binary with no runtime dependencies.
+
 ### Prerequisites
 
 ```bash
