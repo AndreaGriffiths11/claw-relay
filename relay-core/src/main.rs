@@ -38,6 +38,7 @@ async fn main() {
     let ws_host = config.server.host.clone();
 
     let state = state::AppState::new(config, config_path);
+    state::AppState::start_cleanup_task(state.clone());
 
     tracing::info!("Starting Claw Relay (Rust)");
     tracing::info!("WebSocket server on {}:{}", ws_host, ws_port);

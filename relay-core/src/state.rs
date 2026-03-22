@@ -39,6 +39,27 @@ impl AppState {
         })
     }
 
+    /// Spawns a background task that cleans up stale rate limit entries every 60 seconds.
+    pub fn start_cleanup_task(state: Arc<Self>) {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                state.cleanup_stale_rate_limits();
+            }
+        });
+    }
+
+    fn cleanup_stale_rate_limits(&self) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let stale_threshold = 5 * 60 * 1000; // 5 minutes in ms
+        let mut buckets = self.rate_limits.write().unwrap();
+        buckets.retain(|_, bucket| now - bucket.last_reset < stale_threshold);
+    }
+
     pub fn agent_connected(&self, agent_id: &str) {
         let mut conns = self.connections.write().unwrap();
         conns.insert(agent_id.to_string(), AgentState {
