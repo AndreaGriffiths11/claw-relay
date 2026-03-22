@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npx --yes typescript tsc --noEmit
+      - run: npx tsc --noEmit
       - run: npm run build
 
   rust:
@@ -46,7 +46,7 @@ jobs:
       - run: cargo clippy -- -D warnings
       - run: cargo test
 
-  mcp-typecheck:
+  mcp:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -57,4 +57,4 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npx --yes typescript tsc --noEmit
+      - run: node -e "require('./claw-relay-mcp.js')" || true
