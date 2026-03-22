@@ -4,14 +4,15 @@
 
 ## What the extension does
 
-Claw Relay is a status dashboard that connects to your self-hosted Claw Relay server. It displays relay health and connected AI agents.
+Claw Relay is a status dashboard that connects to a Claw Relay server — either your own self-hosted instance or Claw Relay Cloud. It displays relay health and connected AI agents.
 
 ## Data collected
 
-The extension stores **two values** locally on your device using Chrome's `storage` API:
+The extension stores **three values** locally on your device using Chrome's `storage` API:
 
-- **Relay server URL** — the address of your self-hosted relay
+- **Relay server URL** — the address of your relay server (self-hosted or Claw Relay Cloud)
 - **API key** — used to authenticate with your relay server
+- **Agent ID** — identifies which AI agent to connect to
 
 This data never leaves your browser. It is not transmitted to us, to Google, or to any third party.
 
