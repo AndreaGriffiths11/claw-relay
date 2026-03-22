@@ -65,3 +65,7 @@ Or in a config file (`~/.copilot/mcp-config.json`):
 | `CLAW_RELAY_URL` | Yes | WebSocket URL of the Claw Relay server |
 | `CLAW_RELAY_TOKEN` | Yes | Auth token matching relay config |
 | `CLAW_RELAY_AGENT` | No | Agent ID (default: `copilot`) |
+
+## Concurrent Requests
+
+The MCP server includes a `request_id` field with every action sent to the relay. Responses carry the same `request_id` back, allowing the server to match results to the correct pending request even when multiple actions are in flight simultaneously.

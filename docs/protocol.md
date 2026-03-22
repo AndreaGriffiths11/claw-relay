@@ -37,7 +37,7 @@ Success:
 
 Screenshot (base64 tunneling):
 ```json
-{"type": "result", "action": "screenshot", "ok": true, "data": "<base64-encoded-png>", "mimeType": "image/png"}
+{"type": "result", "action": "screenshot", "ok": true, "data": "<base64-encoded-png>", "mimeType": "image/png", "request_id": "mcp-2"}
 ```
 
 The `screenshot` action returns the full-page image as base64-encoded PNG data directly in the WebSocket response. No file paths, no local storage — the agent receives the raw image data it can decode or pass to a vision model.
