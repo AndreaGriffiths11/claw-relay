@@ -239,16 +239,16 @@ export function startDashboard(
 
   app.post('/api/agents', async (c) => {
     try {
-      const body = await c.req.json();
-      const { id, token, scopes, allowlist, rateLimit } = body;
+      const body = await c.req.json() as AgentRequestBody;
       const err = validateAgentFields(body, true);
       if (err) return c.json({ error: err }, 400);
+      const id = body.id!;
       if (config.agents[id]) return c.json({ error: 'Agent already exists' }, 409);
       config.agents[id] = {
-        token,
-        scopes: scopes || ['read'],
-        allowlist: allowlist || ['*'],
-        rateLimit: rateLimit || 30,
+        token: body.token!,
+        scopes: body.scopes || ['read'],
+        allowlist: body.allowlist || ['*'],
+        rateLimit: body.rateLimit || 30,
       };
       writeConfigAtomic(configPath, config);
       reloadCfg();

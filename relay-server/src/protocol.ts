@@ -53,8 +53,8 @@ export function parseMessage(raw: string): IncomingMessage | null {
 
 export function isAuthMessage(msg: IncomingMessage): msg is AuthMessage {
   const isAuthType = msg.type === 'auth';
-  const hasToken = typeof (msg as any).token === 'string';
-  const hasAgentId = typeof (msg as any).agent_id === 'string';
+  const hasToken = typeof (msg as AuthMessage).token === 'string';
+  const hasAgentId = typeof (msg as AuthMessage).agent_id === 'string';
   return isAuthType && hasToken && hasAgentId;
 }
 
@@ -73,7 +73,7 @@ export function isActionMessage(msg: IncomingMessage): msg is ActionMessage {
   if (required) {
     for (const field of required) {
       const fieldExists = field in msg;
-      const fieldIsString = typeof (msg as any)[field] === 'string';
+      const fieldIsString = typeof (msg as Record<string, unknown>)[field] === 'string';
       if (!fieldExists || !fieldIsString) return false;
     }
   }
