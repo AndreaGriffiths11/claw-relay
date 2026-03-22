@@ -124,3 +124,83 @@ pub fn redact_token(token: &str) -> String {
         format!("****{}", &token[token.len()-4..])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_redact_token_long() {
+        assert_eq!(redact_token("my-secret-token"), "****oken");
+    }
+
+    #[test]
+    fn test_redact_token_short() {
+        assert_eq!(redact_token("abc"), "****");
+    }
+
+    #[test]
+    fn test_redact_token_exactly_4() {
+        assert_eq!(redact_token("abcd"), "****");
+    }
+
+    #[test]
+    fn test_redact_token_5_chars() {
+        assert_eq!(redact_token("abcde"), "****bcde");
+    }
+
+    #[test]
+    fn test_defaults() {
+        assert_eq!(default_port(), 9333);
+        assert_eq!(default_host(), "127.0.0.1");
+        assert_eq!(default_rate_limit(), 30);
+        assert_eq!(default_dashboard_port(), 9334);
+        assert_eq!(default_scopes(), vec!["read".to_string()]);
+        assert_eq!(default_allowlist(), vec!["*".to_string()]);
+    }
+
+    #[test]
+    fn test_load_config_yaml() {
+        let yaml = r#"
+server:
+  port: 8080
+  host: "0.0.0.0"
+agents:
+  test:
+    token: "test-token-12345"
+    scopes: ["read", "interact"]
+blocklist:
+  - "evil.com"
+"#;
+        let tmp = std::env::temp_dir().join("test-config.yaml");
+        std::fs::write(&tmp, yaml).unwrap();
+        let config = load_config(tmp.to_str().unwrap()).unwrap();
+        assert_eq!(config.server.port, 8080);
+        assert_eq!(config.server.host, "0.0.0.0");
+        assert!(config.agents.contains_key("test"));
+        assert_eq!(config.blocklist, vec!["evil.com".to_string()]);
+        std::fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn test_load_config_missing_file() {
+        assert!(load_config("/nonexistent/path.yaml").is_err());
+    }
+
+    #[test]
+    fn test_write_config_atomic() {
+        let config = Config {
+            server: ServerConfig::default(),
+            agents: std::collections::HashMap::new(),
+            blocklist: vec![],
+            audit: AuditConfig::default(),
+            engine: EngineConfig::default(),
+            dashboard: DashboardConfig::default(),
+        };
+        let tmp = std::env::temp_dir().join("test-write-config.yaml");
+        write_config_atomic(tmp.to_str().unwrap(), &config).unwrap();
+        let reloaded = load_config(tmp.to_str().unwrap()).unwrap();
+        assert_eq!(reloaded.server.port, 9333);
+        std::fs::remove_file(&tmp).ok();
+    }
+}

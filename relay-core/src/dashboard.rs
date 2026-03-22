@@ -5,7 +5,6 @@ use axum::{
     routing::{get, put},
     Router,
 };
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tower_http::cors::{CorsLayer, AllowOrigin};
@@ -224,13 +223,14 @@ async fn download_audit_handler(
 ) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
     check_auth(&state, &headers)?;
     let entries = state.audit.read_from_file();
-    let json = serde_json::to_string_pretty(&entries).unwrap_or_default();
+    let json = serde_json::to_string_pretty(&entries)
+        .unwrap_or_else(|_| "[]".to_string());
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
     Ok(Response::builder()
         .header("Content-Type", "application/json")
         .header("Content-Disposition", format!("attachment; filename=\"claw-relay-audit-{}.json\"", date))
         .body(axum::body::Body::from(json))
-        .unwrap())
+        .expect("building audit download response cannot fail"))
 }
 
 async fn get_config_handler(
@@ -281,8 +281,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .with_state(state)
         .layer(CorsLayer::new()
             .allow_origin(AllowOrigin::list([
-                "http://localhost:9334".parse().unwrap(),
-                "http://127.0.0.1:9334".parse().unwrap(),
+                "http://localhost:9334".parse().expect("static CORS origin must be valid"),
+                "http://127.0.0.1:9334".parse().expect("static CORS origin must be valid"),
             ]))
             .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE])
             .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]));
@@ -296,6 +296,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     }
 }
 
+#[allow(dead_code)]
 pub async fn start_dashboard(state: Arc<AppState>) {
     let port = state.config.read().expect("lock poisoned").dashboard.port;
     let router = create_router(state);

@@ -45,7 +45,6 @@ impl AuditLogger {
 
         if let Ok(mut entries) = self.entries.write() {
             entries.push(entry);
-            // Keep last 1000 in memory
             if entries.len() > 1000 {
                 let drain = entries.len() - 1000;
                 entries.drain(..drain);
@@ -53,6 +52,7 @@ impl AuditLogger {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_entries(&self) -> Vec<AuditEntry> {
         self.entries.read().map(|e| e.clone()).unwrap_or_default()
     }
@@ -77,5 +77,88 @@ impl AuditLogger {
             .into_iter()
             .rev()
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_entry(action: &str) -> AuditEntry {
+        AuditEntry {
+            timestamp: "2025-01-01T00:00:00Z".to_string(),
+            agent_id: "test".to_string(),
+            action: action.to_string(),
+            target: None,
+            ok: true,
+            duration_ms: 10,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn test_log_and_get_entries() {
+        let tmp = std::env::temp_dir().join("test-audit.jsonl");
+        let logger = AuditLogger::new(tmp.to_str().unwrap(), false);
+        logger.log(test_entry("click"));
+        logger.log(test_entry("snapshot"));
+        let entries = logger.get_entries();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].action, "click");
+        std::fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn test_clear() {
+        let tmp = std::env::temp_dir().join("test-audit-clear.jsonl");
+        let logger = AuditLogger::new(tmp.to_str().unwrap(), false);
+        logger.log(test_entry("click"));
+        logger.clear();
+        assert!(logger.get_entries().is_empty());
+        std::fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn test_read_from_file() {
+        let tmp = std::env::temp_dir().join("test-audit-read.jsonl");
+        let logger = AuditLogger::new(tmp.to_str().unwrap(), false);
+        logger.log(test_entry("navigate"));
+        let from_file = logger.read_from_file();
+        assert_eq!(from_file.len(), 1);
+        assert_eq!(from_file[0].action, "navigate");
+        std::fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn test_read_from_file_empty() {
+        let tmp = std::env::temp_dir().join("test-audit-empty.jsonl");
+        std::fs::write(&tmp, "").ok();
+        let logger = AuditLogger::new(tmp.to_str().unwrap(), false);
+        assert!(logger.read_from_file().is_empty());
+        std::fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn test_entry_with_error() {
+        let entry = AuditEntry {
+            timestamp: "2025-01-01T00:00:00Z".to_string(),
+            agent_id: "test".to_string(),
+            action: "click".to_string(),
+            target: Some("ref1".to_string()),
+            ok: false,
+            duration_ms: 5,
+            error: Some("permission_denied".to_string()),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("permission_denied"));
+        assert!(json.contains("ref1"));
+    }
+
+    #[test]
+    fn test_entry_serialization_skips_none() {
+        let entry = test_entry("snapshot");
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(!json.contains("target"));
+        assert!(!json.contains("error"));
     }
 }

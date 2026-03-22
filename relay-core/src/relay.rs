@@ -6,6 +6,7 @@ use axum::{
     Router,
 };
 use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
 use crate::audit::AuditEntry;
@@ -13,7 +14,54 @@ use crate::auth::authenticate;
 use crate::blocklist::is_allowed;
 use crate::config::AgentConfig;
 use crate::permissions::has_permission;
-use crate::state::AppState;
+use crate::state::{AppState, HEARTBEAT_INTERVAL_SECS, STALE_CONNECTION_SECS};
+
+// ── Typed Protocol Messages ──────────────────────────────────────────
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum IncomingMessage {
+    Auth { token: String, agent_id: String },
+    Ping,
+    Pong,
+    #[serde(other)]
+    Action,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum OutgoingMessage {
+    Error { code: String, message: String, #[serde(skip_serializing_if = "Option::is_none")] request_id: Option<serde_json::Value> },
+    Result { action: String, ok: bool, #[serde(skip_serializing_if = "Option::is_none")] data: Option<String>, #[serde(skip_serializing_if = "Option::is_none")] request_id: Option<serde_json::Value>, #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")] mime_type: Option<String> },
+    Ping,
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+fn error_msg(code: &str, message: &str, request_id: Option<serde_json::Value>) -> String {
+    serde_json::to_string(&OutgoingMessage::Error {
+        code: code.to_string(),
+        message: message.to_string(),
+        request_id,
+    }).expect("OutgoingMessage serialization cannot fail")
+}
+
+fn result_msg(action: &str, data: Option<String>, request_id: Option<serde_json::Value>, mime_type: Option<String>) -> String {
+    serde_json::to_string(&OutgoingMessage::Result {
+        action: action.to_string(),
+        ok: true,
+        data,
+        request_id,
+        mime_type,
+    }).expect("OutgoingMessage serialization cannot fail")
+}
+
+fn ping_msg() -> String {
+    serde_json::to_string(&OutgoingMessage::Ping).expect("OutgoingMessage serialization cannot fail")
+}
+
+// ── WebSocket Handler ────────────────────────────────────────────────
 
 async fn ws_handler(
     ws: WebSocketUpgrade,
@@ -41,9 +89,9 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         let parsed: serde_json::Value = match serde_json::from_str(&msg) {
             Ok(v) => v,
             Err(_) => {
-                let _ = sender.send(Message::Text(serde_json::json!({
-                    "type": "error", "code": "invalid_message", "message": "Could not parse message"
-                }).to_string().into())).await;
+                let _ = sender.send(Message::Text(
+                    error_msg("invalid_message", "Could not parse message", None).into()
+                )).await;
                 continue;
             }
         };
@@ -51,37 +99,37 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         let msg_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
         if msg_type != "auth" {
-            let _ = sender.send(Message::Text(serde_json::json!({
-                "type": "error", "code": "not_authenticated", "message": "Send auth message first"
-            }).to_string().into())).await;
+            let _ = sender.send(Message::Text(
+                error_msg("not_authenticated", "Send auth message first", None).into()
+            )).await;
             continue;
         }
 
         let token = parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
         let aid = parsed.get("agent_id").and_then(|v| v.as_str()).unwrap_or("");
 
-        let config = state.config.read().expect("lock poisoned").clone();
+        let config = state.config.read().expect("config lock poisoned").clone();
         match authenticate(&config, token, aid) {
             None => {
-                let _ = sender.send(Message::Text(serde_json::json!({
-                    "type": "error", "code": "auth_failed", "message": "Invalid token or agent_id"
-                }).to_string().into())).await;
+                let _ = sender.send(Message::Text(
+                    error_msg("auth_failed", "Invalid token or agent_id", None).into()
+                )).await;
                 return;
             }
             Some(cfg) => {
                 if state.is_agent_connected(aid) {
-                    let _ = sender.send(Message::Text(serde_json::json!({
-                        "type": "error", "code": "duplicate_agent", "message": "Agent ID already connected"
-                    }).to_string().into())).await;
+                    let _ = sender.send(Message::Text(
+                        error_msg("duplicate_agent", "Agent ID already connected", None).into()
+                    )).await;
                     return;
                 }
                 authenticated = true;
                 agent_id = Some(aid.to_string());
                 agent_config = Some(cfg);
                 state.agent_connected(aid);
-                let _ = sender.send(Message::Text(serde_json::json!({
-                    "type": "result", "action": "auth", "ok": true
-                }).to_string().into())).await;
+                let _ = sender.send(Message::Text(
+                    result_msg("auth", None, None, None).into()
+                )).await;
                 break;
             }
         }
@@ -91,8 +139,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         return;
     }
 
-    let aid = agent_id.clone().unwrap();
-    let cfg = agent_config.unwrap();
+    let aid = agent_id.expect("agent_id must be Some after successful authentication");
+    let cfg = agent_config.expect("agent_config must be Some after successful authentication");
 
     // Heartbeat: wrap sender in Arc<Mutex> for sharing with ping task
     let sender = Arc::new(tokio::sync::Mutex::new(sender));
@@ -103,20 +151,18 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
     let ping_pong = last_pong.clone();
     let ping_aid = aid.clone();
     let ping_handle = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(HEARTBEAT_INTERVAL_SECS));
         loop {
             interval.tick().await;
             let elapsed = ping_pong.lock().await.elapsed();
-            if elapsed > std::time::Duration::from_secs(90) {
+            if elapsed > std::time::Duration::from_secs(STALE_CONNECTION_SECS) {
                 tracing::warn!("Agent {} heartbeat timeout, disconnecting", ping_aid);
                 let mut s = ping_sender.lock().await;
                 let _ = s.close().await;
                 break;
             }
             let mut s = ping_sender.lock().await;
-            if s.send(Message::Text(
-                serde_json::json!({"type":"ping"}).to_string().into()
-            )).await.is_err() {
+            if s.send(Message::Text(ping_msg().into())).await.is_err() {
                 break;
             }
         }
@@ -135,9 +181,9 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
             Ok(v) => v,
             Err(_) => {
                 let mut s = sender.lock().await;
-                let _ = s.send(Message::Text(serde_json::json!({
-                    "type": "error", "code": "invalid_message", "message": "Could not parse message"
-                }).to_string().into())).await;
+                let _ = s.send(Message::Text(
+                    error_msg("invalid_message", "Could not parse message", None).into()
+                )).await;
                 continue;
             }
         };
@@ -157,21 +203,18 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                             "press", "hover", "select", "evaluate", "close"];
         if !valid_actions.contains(&action) {
             let mut s = sender.lock().await;
-            let _ = s.send(Message::Text(serde_json::json!({
-                "type": "error", "code": "invalid_action", "message": "Unknown action type"
-            }).to_string().into())).await;
+            let _ = s.send(Message::Text(
+                error_msg("invalid_action", "Unknown action type", req_id).into()
+            )).await;
             continue;
         }
 
         // Permission check
         if !has_permission(&cfg.scopes, action) {
-            let mut resp = serde_json::json!({
-                "type": "error", "code": "permission_denied", 
-                "message": format!("Agent lacks required scope for '{}'", action)
-            });
-            if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
             let mut s = sender.lock().await;
-            let _ = s.send(Message::Text(resp.to_string().into())).await;
+            let _ = s.send(Message::Text(
+                error_msg("permission_denied", &format!("Agent lacks required scope for '{}'", action), req_id).into()
+            )).await;
             state.audit.log(AuditEntry {
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 agent_id: aid.clone(), action: action.to_string(),
@@ -183,12 +226,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
         // Rate limit
         if !state.check_rate_limit(&aid, cfg.rate_limit) {
-            let mut resp = serde_json::json!({
-                "type": "error", "code": "rate_limited", "message": "Rate limit exceeded"
-            });
-            if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
             let mut s = sender.lock().await;
-            let _ = s.send(Message::Text(resp.to_string().into())).await;
+            let _ = s.send(Message::Text(
+                error_msg("rate_limited", "Rate limit exceeded", req_id).into()
+            )).await;
             state.audit.log(AuditEntry {
                 timestamp: chrono::Utc::now().to_rfc3339(),
                 agent_id: aid.clone(), action: action.to_string(),
@@ -199,18 +240,16 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
         }
 
         // URL allowlist/blocklist check for navigate
-        let config = state.config.read().expect("lock poisoned").clone();
+        let config = state.config.read().expect("config lock poisoned").clone();
         if action == "navigate" {
             if let Some(url) = parsed.get("url").and_then(|v| v.as_str()) {
                 let check = is_allowed(url, &cfg.allowlist, &config.blocklist);
                 if !check.allowed {
                     let reason = check.reason.unwrap_or_else(|| "Site blocked".to_string());
-                    let mut resp = serde_json::json!({
-                        "type": "error", "code": "site_blocked", "message": reason
-                    });
-                    if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                     let mut s = sender.lock().await;
-                    let _ = s.send(Message::Text(resp.to_string().into())).await;
+                    let _ = s.send(Message::Text(
+                        error_msg("site_blocked", &reason, req_id).into()
+                    )).await;
                     state.audit.log(AuditEntry {
                         timestamp: chrono::Utc::now().to_rfc3339(),
                         agent_id: aid.clone(), action: action.to_string(),
@@ -228,12 +267,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     let check = is_allowed(&current_url, &cfg.allowlist, &config.blocklist);
                     if !check.allowed {
                         let reason = check.reason.unwrap_or_else(|| "Current site is blocked".to_string());
-                        let mut resp = serde_json::json!({
-                            "type": "error", "code": "site_blocked", "message": reason
-                        });
-                        if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                         let mut s = sender.lock().await;
-                        let _ = s.send(Message::Text(resp.to_string().into())).await;
+                        let _ = s.send(Message::Text(
+                            error_msg("site_blocked", &reason, req_id).into()
+                        )).await;
                         state.audit.log(AuditEntry {
                             timestamp: chrono::Utc::now().to_rfc3339(),
                             agent_id: aid.clone(), action: action.to_string(),
@@ -269,7 +306,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
                 // Screenshot tunneling: read the file and send as base64
                 if action == "screenshot" && !data.is_empty() {
-                    // Extract path ending in .png using string matching (no regex)
                     let screenshot_path = data.split_whitespace()
                         .find(|s| s.starts_with('/') && s.ends_with(".png"));
                     if let Some(screenshot_path) = screenshot_path {
@@ -277,13 +313,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                             Ok(bytes) => {
                                 use base64::Engine as _;
                                 let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-                                let mut resp = serde_json::json!({
-                                    "type": "result", "action": "screenshot", "ok": true,
-                                    "data": b64, "mimeType": "image/png"
-                                });
-                                if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                                 let mut s = sender.lock().await;
-                                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                                let _ = s.send(Message::Text(
+                                    result_msg("screenshot", Some(b64), req_id, Some("image/png".to_string())).into()
+                                )).await;
                                 continue;
                             }
                             Err(e) => {
@@ -294,13 +327,11 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     }
                 }
 
-                let mut resp = serde_json::json!({"type": "result", "action": action, "ok": true});
-                if !data.is_empty() {
-                    resp["data"] = serde_json::Value::String(data);
-                }
-                if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
+                let resp_data = if data.is_empty() { None } else { Some(data) };
                 let mut s = sender.lock().await;
-                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                let _ = s.send(Message::Text(
+                    result_msg(action, resp_data, req_id, None).into()
+                )).await;
             }
             Err(e) => {
                 state.audit.log(AuditEntry {
@@ -309,12 +340,10 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                     target, ok: false, duration_ms: duration,
                     error: Some(e.clone()),
                 });
-                let mut resp = serde_json::json!({
-                    "type": "error", "code": "engine_error", "message": e
-                });
-                if let Some(ref rid) = req_id { resp["request_id"] = rid.clone(); }
                 let mut s = sender.lock().await;
-                let _ = s.send(Message::Text(resp.to_string().into())).await;
+                let _ = s.send(Message::Text(
+                    error_msg("engine_error", &e, req_id).into()
+                )).await;
             }
         }
     }
