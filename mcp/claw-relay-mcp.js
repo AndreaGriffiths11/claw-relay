@@ -157,37 +157,37 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-server.tool("browser_navigate", "Navigate browser to a URL", { url: z.string() }, async ({ url }) => {
+server.tool("browser_navigate", "Navigate the browser to a URL. Use this to open any webpage. Returns confirmation when navigation completes.", { url: z.string() }, async ({ url }) => {
   const result = await sendAction({ type: "navigate", url });
   return { content: [{ type: "text", text: result.data || "Navigated" }] };
 });
 
-server.tool("browser_click", "Click an element by ref", { ref: z.string() }, async ({ ref }) => {
+server.tool("browser_click", "Click an element on the page. Requires a ref from browser_snapshot (e.g. 'e5'). Call browser_snapshot first to find the ref.", { ref: z.string() }, async ({ ref }) => {
   const result = await sendAction({ type: "click", ref });
   return { content: [{ type: "text", text: result.data || "Clicked" }] };
 });
 
-server.tool("browser_type", "Type text into an element (appends)", { ref: z.string(), text: z.string() }, async ({ ref, text }) => {
+server.tool("browser_type", "Type text into an input element (appends to existing text). Requires a ref from browser_snapshot.", { ref: z.string(), text: z.string() }, async ({ ref, text }) => {
   const result = await sendAction({ type: "type", ref, text });
   return { content: [{ type: "text", text: result.data || "Typed" }] };
 });
 
-server.tool("browser_fill", "Fill an input element (replaces content)", { ref: z.string(), text: z.string() }, async ({ ref, text }) => {
+server.tool("browser_fill", "Fill an input element, replacing any existing content. Requires a ref from browser_snapshot.", { ref: z.string(), text: z.string() }, async ({ ref, text }) => {
   const result = await sendAction({ type: "fill", ref, text });
   return { content: [{ type: "text", text: result.data || "Filled" }] };
 });
 
-server.tool("browser_press", "Press a key (Enter, Tab, etc.)", { key: z.string() }, async ({ key }) => {
+server.tool("browser_press", "Press a keyboard key (e.g. 'Enter', 'Tab', 'Escape', 'ArrowDown'). Use after typing to submit forms.", { key: z.string() }, async ({ key }) => {
   const result = await sendAction({ type: "press", key });
   return { content: [{ type: "text", text: result.data || "Pressed" }] };
 });
 
-server.tool("browser_snapshot", "Get accessibility tree of current page", {}, async () => {
+server.tool("browser_snapshot", "Get the accessibility tree of the current page. Returns element refs (e.g. e1, e5) that you use with click, type, fill, and other tools. ALWAYS call this first to understand the page structure.", {}, async () => {
   const result = await sendAction({ type: "snapshot" });
   return { content: [{ type: "text", text: result.data || "No snapshot data" }] };
 });
 
-server.tool("browser_screenshot", "Take a screenshot of the current page", {}, async () => {
+server.tool("browser_screenshot", "Take a PNG screenshot of the current page. Returns the image. Use browser_snapshot instead if you need to interact with elements.", {}, async () => {
   const result = await sendAction({ type: "screenshot" });
   // If data looks like base64 image, return as image content
   if (result.data && result.data.length > 200 && !result.data.includes(" ")) {
@@ -198,22 +198,22 @@ server.tool("browser_screenshot", "Take a screenshot of the current page", {}, a
   return { content: [{ type: "text", text: result.data || "No screenshot data" }] };
 });
 
-server.tool("browser_hover", "Hover over an element by ref", { ref: z.string() }, async ({ ref }) => {
+server.tool("browser_hover", "Hover over an element by ref. Triggers hover menus and tooltips.", { ref: z.string() }, async ({ ref }) => {
   const result = await sendAction({ type: "hover", ref });
   return { content: [{ type: "text", text: result.data || "Hovered" }] };
 });
 
-server.tool("browser_select", "Select an option from a dropdown by ref and values", { ref: z.string(), values: z.array(z.string()) }, async ({ ref, values }) => {
+server.tool("browser_select", "Select options from a dropdown element by ref and values.", { ref: z.string(), values: z.array(z.string()) }, async ({ ref, values }) => {
   const result = await sendAction({ type: "select", ref, values });
   return { content: [{ type: "text", text: result.data || "Selected" }] };
 });
 
-server.tool("browser_evaluate", "Run JavaScript in the browser page", { js: z.string() }, async ({ js }) => {
+server.tool("browser_evaluate", "Run JavaScript code in the browser page. Returns the result. Use sparingly — prefer snapshot and click for most tasks.", { js: z.string() }, async ({ js }) => {
   const result = await sendAction({ type: "evaluate", js });
   return { content: [{ type: "text", text: result.data || "Evaluated" }] };
 });
 
-server.tool("browser_close", "Close the current browser tab", {}, async () => {
+server.tool("browser_close", "Close the current browser tab.", {}, async () => {
   const result = await sendAction({ type: "close" });
   return { content: [{ type: "text", text: result.data || "Closed" }] };
 });
