@@ -1,6 +1,10 @@
+// Claw Relay™ — WebSocket server that sits between AI agents and
+// a browser engine, enforcing permissions, rate limits, and site
+// restrictions on every action.
+
 import * as path from 'path';
-import { loadConfig, reloadConfig, authenticate, AgentConfig } from './auth';
-import { parseMessage, isAuthMessage, isActionMessage, ActionMessage, OutgoingMessage } from './protocol';
+import { loadConfig, authenticate, type Config, type AgentConfig } from './auth';
+import { parseMessage, isAuthMessage, isActionMessage, type ActionMessage, type OutgoingMessage } from './protocol';
 import { hasPermission } from './permissions';
 import { isAllowed } from './allowlist';
 import { RateLimiter } from './rate-limiter';
@@ -11,19 +15,26 @@ import { startDashboard } from './dashboard';
 
 import type { ServerWebSocket } from 'bun';
 
+// --- Config ---
+
 const configPath = process.argv[2] || path.join(import.meta.dir, '..', 'config.example.yaml');
 let config = loadConfig(configPath);
 
 export function reloadCurrentConfig(): void {
-  config = reloadConfig(configPath);
+  config = loadConfig(configPath);
 }
 
 export function getConfigPath(): string {
   return configPath;
 }
+
+// --- Shared services ---
+
 const rateLimiter = new RateLimiter();
 const audit = new AuditLogger(config.audit.logFile, config.audit.logToStdout);
 const engine = new Engine(config.engine.binary, config.engine.timeout);
+
+// --- Connection tracking ---
 
 interface ClientState {
   authenticated: boolean;
@@ -35,17 +46,19 @@ const clients = new WeakMap<object, ClientState>();
 const connectedAgentIds = new Map<string, ServerWebSocket<unknown>>();
 const lastPong = new Map<string, number>();
 
-const HEARTBEAT_INTERVAL_MS = 30_000;
-const STALE_CONNECTION_MS = 90_000;
+// --- Heartbeat ---
+// Ping connected agents every 30s. If an agent hasn't ponged in 90s,
+// assume the connection is dead and drop it. Without this, zombie
+// connections accumulate and block reconnection (duplicate agent ID check).
 
-// Heartbeat: ping every 30s, kill stale connections after 90s
+const HEARTBEAT_INTERVAL_MS = 30_000;
+const STALE_THRESHOLD_MS = 90_000;
+
 const heartbeatInterval = setInterval(() => {
   const now = Date.now();
   for (const [agentId, ws] of connectedAgentIds) {
-    const last = lastPong.get(agentId) || now;
-    const timeSinceLastPong = now - last;
-    const isStale = timeSinceLastPong > STALE_CONNECTION_MS;
-    if (isStale) {
+    const elapsed = now - (lastPong.get(agentId) || now);
+    if (elapsed > STALE_THRESHOLD_MS) {
       console.warn(`Agent ${agentId} stale (no pong in 90s), disconnecting`);
       ws.close(1001, 'Connection stale');
       continue;
@@ -54,163 +67,177 @@ const heartbeatInterval = setInterval(() => {
   }
 }, HEARTBEAT_INTERVAL_MS);
 
-function send(ws: ServerWebSocket<unknown>, msg: OutgoingMessage) {
-  const serialized = JSON.stringify(msg);
-  ws.send(serialized);
+// --- Message handling ---
+
+function send(ws: ServerWebSocket<unknown>, msg: OutgoingMessage): void {
+  ws.send(JSON.stringify(msg));
 }
 
-async function handleMessage(ws: ServerWebSocket<unknown>, raw: string) {
+async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise<void> {
   const state = clients.get(ws)!;
   const msg = parseMessage(raw);
+
   if (!msg) {
     send(ws, { type: 'error', code: 'invalid_message', message: 'Could not parse message' });
     return;
   }
 
-  // Handle pong
   if (msg.type === 'pong') {
-    const s = clients.get(ws);
-    if (s?.agentId) lastPong.set(s.agentId, Date.now());
+    if (state.agentId) lastPong.set(state.agentId, Date.now());
     return;
   }
 
-  // Auth flow
+  // --- Authentication gate ---
   if (!state.authenticated) {
     if (!isAuthMessage(msg)) {
       send(ws, { type: 'error', code: 'not_authenticated', message: 'Send auth message first' });
       return;
     }
-    const agentConfig = authenticate(config, msg.token, msg.agent_id);
-    if (!agentConfig) {
-      send(ws, { type: 'error', code: 'auth_failed', message: 'Invalid token or agent_id' });
-      ws.close();
-      return;
-    }
-    // Reject duplicate agent ID
-    if (connectedAgentIds.has(msg.agent_id)) {
-      console.warn(`Warning: Duplicate agent ID rejected: ${msg.agent_id}`);
-      send(ws, { type: 'error', code: 'duplicate_agent', message: 'Agent ID already connected' });
-      ws.close(4009, 'Agent ID already connected');
-      return;
-    }
-    state.authenticated = true;
-    state.agentId = msg.agent_id;
-    state.agentConfig = agentConfig;
-    connectedAgentIds.set(msg.agent_id, ws);
-    lastPong.set(msg.agent_id, Date.now());
-    agentConnected(msg.agent_id);
-    send(ws, { type: 'result', action: 'auth', ok: true });
+    handleAuth(ws, state, msg.token, msg.agent_id);
     return;
   }
 
-  // Action flow
+  // --- Action pipeline ---
   if (!isActionMessage(msg)) {
     send(ws, { type: 'error', code: 'invalid_action', message: 'Unknown action type' });
     return;
   }
 
-  const actionMsg = msg as ActionMessage;
+  await handleAction(ws, state, msg);
+}
+
+function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: string, agentId: string): void {
+  const agentConfig = authenticate(config, token, agentId);
+  if (!agentConfig) {
+    send(ws, { type: 'error', code: 'auth_failed', message: 'Invalid token or agent_id' });
+    ws.close();
+    return;
+  }
+
+  // One connection per agent ID — prevents conflicting actions
+  if (connectedAgentIds.has(agentId)) {
+    console.warn(`Duplicate agent ID rejected: ${agentId}`);
+    send(ws, { type: 'error', code: 'duplicate_agent', message: 'Agent ID already connected' });
+    ws.close(4009, 'Agent ID already connected');
+    return;
+  }
+
+  state.authenticated = true;
+  state.agentId = agentId;
+  state.agentConfig = agentConfig;
+  connectedAgentIds.set(agentId, ws);
+  lastPong.set(agentId, Date.now());
+  agentConnected(agentId);
+  send(ws, { type: 'result', action: 'auth', ok: true });
+}
+
+async function handleAction(ws: ServerWebSocket<unknown>, state: ClientState, msg: ActionMessage): Promise<void> {
   const agentId = state.agentId!;
   const agentCfg = state.agentConfig!;
-  const reqId = actionMsg.request_id;
+  const reqId = msg.request_id;
 
   // Permission check
-  if (!hasPermission(agentCfg.scopes, actionMsg.type)) {
-    send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks required scope for '${actionMsg.type}'`, request_id: reqId });
-    audit.log({ agent_id: agentId, action: actionMsg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
+  if (!hasPermission(agentCfg.scopes, msg.type)) {
+    send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks scope for '${msg.type}'`, request_id: reqId });
+    audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
     return;
   }
 
   // Rate limit check
   if (!rateLimiter.check(agentId, agentCfg.rateLimit)) {
     send(ws, { type: 'error', code: 'rate_limited', message: 'Rate limit exceeded', request_id: reqId });
-    audit.log({ agent_id: agentId, action: actionMsg.type, ok: false, duration_ms: 0, error: 'rate_limited' });
+    audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'rate_limited' });
     return;
   }
 
-  // URL allowlist check
-  if (actionMsg.type === 'navigate' && actionMsg.url) {
-    const check = isAllowed(actionMsg.url, agentCfg.allowlist, config.blocklist);
-    if (!check.allowed) {
-      const reason = check.reason || 'Site blocked';
-      send(ws, { type: 'error', code: 'site_blocked', message: reason, request_id: reqId });
-      audit.log({ agent_id: agentId, action: actionMsg.type, target: actionMsg.url, ok: false, duration_ms: 0, error: 'site_blocked' });
-      return;
-    }
-  } else if (actionMsg.type !== 'close') {
-    const currentUrl = await engine.getCurrentUrl();
-    if (currentUrl) {
-      const check = isAllowed(currentUrl, agentCfg.allowlist, config.blocklist);
-      if (!check.allowed) {
-        const reason = check.reason || 'Current site blocked';
-        send(ws, { type: 'error', code: 'site_blocked', message: reason, request_id: reqId });
-        audit.log({ agent_id: agentId, action: actionMsg.type, target: currentUrl, ok: false, duration_ms: 0, error: 'site_blocked' });
-        return;
-      }
-    }
+  // URL restriction — navigate checks the target URL,
+  // all other actions check the current URL (except close)
+  const blockError = await checkUrlRestrictions(msg, agentCfg);
+  if (blockError) {
+    send(ws, { type: 'error', code: 'site_blocked', message: blockError.reason, request_id: reqId });
+    audit.log({ agent_id: agentId, action: msg.type, target: blockError.url, ok: false, duration_ms: 0, error: 'site_blocked' });
+    return;
   }
 
-  // Execute
+  // Execute and respond
   const startTime = Date.now();
-  const result = await engine.execute(actionMsg);
-  const endTime = Date.now();
-  const duration = endTime - startTime;
+  const result = await engine.execute(msg);
+  const duration = Date.now() - startTime;
+  const target = msg.ref || msg.url || msg.key || undefined;
 
-  const target = actionMsg.ref || actionMsg.url || actionMsg.key || undefined;
-  agentAction(agentId, actionMsg.type);
-  audit.log({ agent_id: agentId, action: actionMsg.type, target, ok: result.ok, duration_ms: duration, error: result.error });
+  agentAction(agentId, msg.type);
+  audit.log({ agent_id: agentId, action: msg.type, target, ok: result.ok, duration_ms: duration, error: result.error });
 
-  if (result.ok) {
-    // For screenshots, tunnel the image data as base64
-    if (actionMsg.type === 'screenshot' && result.data) {
-      // Extract file path from agent-browser output (e.g. "✓ Screenshot saved to /path/to/file.png")
-      const pathMatch = result.data.match(/\/\S+\.png/);
-      const screenshotPath = pathMatch ? pathMatch[0] : result.data.trim();
-      try {
-        const file = Bun.file(screenshotPath);
-        const buf = await file.arrayBuffer();
-        const base64 = Buffer.from(buf).toString('base64');
-        send(ws, {
-          type: 'result',
-          action: 'screenshot',
-          ok: true,
-          data: base64,
-          mimeType: 'image/png',
-          request_id: reqId,
-        });
-      } catch (e: unknown) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        // Fall back to just the path if file read fails
-        console.error(`Screenshot tunnel error: ${errMsg} (path: ${screenshotPath})`);
-        send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, request_id: reqId });
-      }
-    } else {
-      send(ws, { type: 'result', action: actionMsg.type, ok: true, data: result.data, request_id: reqId });
-    }
+  if (!result.ok) {
+    send(ws, { type: 'error', code: 'engine_error', message: result.error || 'Unknown error', request_id: reqId });
+    return;
+  }
+
+  // Screenshots get tunneled as base64 so agents don't need filesystem access
+  if (msg.type === 'screenshot' && result.data) {
+    await sendScreenshot(ws, result.data, reqId);
   } else {
-    const errorMessage = result.error || 'Unknown error';
-    send(ws, { type: 'error', code: 'engine_error', message: errorMessage, request_id: reqId });
+    send(ws, { type: 'result', action: msg.type, ok: true, data: result.data, request_id: reqId });
   }
 }
 
-// WebSocket server using Bun.serve()
+async function checkUrlRestrictions(
+  msg: ActionMessage,
+  agentCfg: AgentConfig,
+): Promise<{ reason: string; url: string } | null> {
+  let urlToCheck: string | null = null;
+
+  if (msg.type === 'navigate' && msg.url) {
+    urlToCheck = msg.url;
+  } else if (msg.type !== 'close') {
+    urlToCheck = await engine.getCurrentUrl();
+  }
+
+  if (!urlToCheck) return null;
+
+  const check = isAllowed(urlToCheck, agentCfg.allowlist, config.blocklist);
+  if (check.allowed) return null;
+  return { reason: check.reason || 'Site blocked', url: urlToCheck };
+}
+
+async function sendScreenshot(ws: ServerWebSocket<unknown>, engineOutput: string, reqId?: string): Promise<void> {
+  // Engine returns formatted text like "✓ Screenshot saved to /path/file.png"
+  const pathMatch = engineOutput.match(/\/\S+\.png/);
+  const screenshotPath = pathMatch ? pathMatch[0] : engineOutput.trim();
+
+  try {
+    const buf = await Bun.file(screenshotPath).arrayBuffer();
+    send(ws, {
+      type: 'result',
+      action: 'screenshot',
+      ok: true,
+      data: Buffer.from(buf).toString('base64'),
+      mimeType: 'image/png',
+      request_id: reqId,
+    });
+  } catch (e: unknown) {
+    // File read failed — fall back to raw engine output
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error(`Screenshot tunnel error: ${errMsg} (path: ${screenshotPath})`);
+    send(ws, { type: 'result', action: 'screenshot', ok: true, data: engineOutput, request_id: reqId });
+  }
+}
+
+// --- WebSocket server ---
+
 const wsServer = Bun.serve({
   port: config.server.port,
   hostname: config.server.host,
   fetch(req, server) {
-    // Upgrade WebSocket connections
-    if (server.upgrade(req)) {
-      return; // upgraded
-    }
-    return new Response('WebSocket server', { status: 200 });
+    if (server.upgrade(req)) return;
+    return new Response('Claw Relay™ WebSocket server', { status: 200 });
   },
   websocket: {
     open(ws) {
       clients.set(ws, { authenticated: false });
     },
     message(ws, message) {
-      const isString = typeof message === 'string';
-      const decoded = isString ? message : new TextDecoder().decode(message);
+      const decoded = typeof message === 'string' ? message : new TextDecoder().decode(message);
       handleMessage(ws, decoded);
     },
     close(ws) {
@@ -225,18 +252,21 @@ const wsServer = Bun.serve({
   },
 });
 
-console.log(`Claw Relay server listening on ${config.server.host}:${config.server.port}`);
+console.log(`Claw Relay™ listening on ${config.server.host}:${config.server.port}`);
 
-// Graceful shutdown
-function gracefulShutdown() {
-  console.log('Shutting down gracefully...');
+// --- Graceful shutdown ---
+
+function shutdown(): void {
+  console.log('Shutting down...');
   clearInterval(heartbeatInterval);
   wsServer.stop();
-  console.log('Server stopped');
+  rateLimiter.destroy();
   process.exit(0);
 }
 
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
-startDashboard(config, getState, configPath, () => { reloadCurrentConfig(); });
+// --- Dashboard ---
+
+startDashboard(config, getState, configPath, reloadCurrentConfig);

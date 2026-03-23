@@ -1,26 +1,36 @@
 import * as fs from 'fs';
 
+// Append-only JSONL audit log. Each line is a self-contained JSON record
+// with timestamp, agent, action, and outcome. Designed for grep/jq analysis.
+
 export class AuditLogger {
-  private stream: fs.WriteStream | null = null;
-  private logToStdout: boolean;
+  private readonly stream: fs.WriteStream;
+  private readonly logToStdout: boolean;
 
   constructor(logFile: string, logToStdout: boolean = true) {
     this.stream = fs.createWriteStream(logFile, { flags: 'a' });
     this.logToStdout = logToStdout;
   }
 
-  log(entry: { agent_id: string; action: string; target?: string; ok: boolean; duration_ms: number; error?: string }) {
-    const timestamp = new Date().toISOString();
-    const record = { timestamp, ...entry };
+  log(entry: {
+    agent_id: string;
+    action: string;
+    target?: string;
+    ok: boolean;
+    duration_ms: number;
+    error?: string;
+  }): void {
+    const record = { timestamp: new Date().toISOString(), ...entry };
     const line = JSON.stringify(record);
-    const lineWithNewline = line + '\n';
-    this.stream?.write(lineWithNewline);
+    this.stream.write(line + '\n');
     if (this.logToStdout) console.log(line);
   }
 }
 
 /**
- * Read the last N lines from a file efficiently by reading chunks from the end.
+ * Read the last N lines from a file by scanning backward in chunks.
+ * Used by the dashboard to show recent audit entries without loading
+ * the entire log into memory.
  */
 export function tailLines(filePath: string, count: number = 200): string[] {
   let fd: number;
@@ -31,8 +41,7 @@ export function tailLines(filePath: string, count: number = 200): string[] {
   }
 
   try {
-    const stat = fs.fstatSync(fd);
-    const fileSize = stat.size;
+    const fileSize = fs.fstatSync(fd).size;
     if (fileSize === 0) return [];
 
     const CHUNK = 8192;
@@ -45,11 +54,8 @@ export function tailLines(filePath: string, count: number = 200): string[] {
       pos -= readSize;
       const buf = Buffer.alloc(readSize);
       fs.readSync(fd, buf, 0, readSize, pos);
-      const chunk = buf.toString('utf-8') + remainder;
-      const parts = chunk.split('\n');
-      // First element is partial (or beginning of file) — save as remainder
+      const parts = (buf.toString('utf-8') + remainder).split('\n');
       remainder = parts[0];
-      // Rest are complete lines (last split element may be empty from trailing \n)
       for (let i = parts.length - 1; i >= 1; i--) {
         if (parts[i].length > 0) {
           lines.push(parts[i]);
@@ -58,7 +64,7 @@ export function tailLines(filePath: string, count: number = 200): string[] {
       }
     }
 
-    // If we consumed the whole file, remainder is the first line
+    // Remaining content at file start is the first line
     if (pos === 0 && remainder.length > 0 && lines.length < count) {
       lines.push(remainder);
     }

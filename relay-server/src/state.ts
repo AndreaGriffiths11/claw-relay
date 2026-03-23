@@ -1,12 +1,16 @@
+// Tracks connected agents and their activity for the dashboard.
+// All state lives in-memory — restarting the relay resets counters.
+
 export interface AgentState {
-  agentId: string;
-  connectedAt: string;
+  readonly agentId: string;
+  readonly connectedAt: string;
   lastAction: string | null;
   lastActionAt: string | null;
   actionCount: number;
 }
 
 const connections = new Map<string, AgentState>();
+const serverStartedAt = new Date().toISOString();
 
 export function agentConnected(agentId: string): void {
   connections.set(agentId, {
@@ -24,11 +28,10 @@ export function agentDisconnected(agentId: string): void {
 
 export function agentAction(agentId: string, action: string): void {
   const state = connections.get(agentId);
-  if (state) {
-    state.lastAction = action;
-    state.lastActionAt = new Date().toISOString();
-    state.actionCount++;
-  }
+  if (!state) return;
+  state.lastAction = action;
+  state.lastActionAt = new Date().toISOString();
+  state.actionCount++;
 }
 
 export function getState(): { connections: AgentState[]; startedAt: string } {
@@ -37,5 +40,3 @@ export function getState(): { connections: AgentState[]; startedAt: string } {
     startedAt: serverStartedAt,
   };
 }
-
-const serverStartedAt = new Date().toISOString();
