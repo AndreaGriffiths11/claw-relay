@@ -37,6 +37,12 @@ function connect() {
   connectPromise = new Promise((resolveConn, rejectConn) => {
     ws = new WebSocket(RELAY_URL);
 
+    // #18: Auth timeout — don't wait forever for relay to respond
+    const authTimeout = setTimeout(() => {
+      rejectConn(new Error("Auth timeout — relay did not respond within 30s"));
+      ws.close();
+    }, 30_000);
+
     ws.on("open", () => {
       // Authenticate immediately
       authPromise = sendRaw({
@@ -62,6 +68,7 @@ function connect() {
 
       // Auth response
       if (msg.type === "result" && msg.action === "auth") {
+        clearTimeout(authTimeout);
         if (msg.ok) {
           authenticated = true;
           reconnectDelay = 1000;

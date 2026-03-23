@@ -56,3 +56,17 @@ The `request_id` field is optional. If omitted from the request, it won't appear
 - **navigate** — open URLs (subject to allowlist/blocklist)
 - **interact** — click, type, fill, select, hover (active control)
 - **execute** — run JavaScript on the page (full access — use with extreme caution)
+
+## Heartbeat
+
+The relay server sends `{"type": "ping"}` every 30 seconds. Clients **must** respond with `{"type": "pong"}` within 90 seconds or the connection will be closed as stale.
+
+This prevents zombie connections from accumulating when network drops happen silently (common with tunnels and mobile networks). If your agent doesn't implement pong, it will be disconnected after ~90 seconds of inactivity.
+
+```json
+// Server → Client
+{"type": "ping"}
+
+// Client → Server (respond within 90s)
+{"type": "pong"}
+```

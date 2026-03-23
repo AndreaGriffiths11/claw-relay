@@ -61,7 +61,7 @@ Edit `config.yaml`:
 ```yaml
 server:
   port: 9333              # don't use 9222 — that's Chrome's debugging port
-  host: "0.0.0.0"         # accepts connections from tunnels and local
+  host: "0.0.0.0"         # required for tunnels; use "127.0.0.1" for local-only
 
 agents:
   my-agent:

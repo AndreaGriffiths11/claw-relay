@@ -270,6 +270,13 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         config_dir.join("dashboard/dist")
     };
 
+    // #9: CORS uses configured port, not hardcoded 9334
+    let dash_port = state.config.read().expect("lock poisoned").dashboard.port;
+    let origin_localhost: axum::http::HeaderValue = format!("http://localhost:{}", dash_port)
+        .parse().expect("localhost CORS origin must be valid");
+    let origin_127: axum::http::HeaderValue = format!("http://127.0.0.1:{}", dash_port)
+        .parse().expect("127.0.0.1 CORS origin must be valid");
+
     let api = Router::new()
         .route("/health", get(health_handler))
         .route("/api/status", get(status_handler))
@@ -280,10 +287,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/config", get(get_config_handler))
         .with_state(state)
         .layer(CorsLayer::new()
-            .allow_origin(AllowOrigin::list([
-                "http://localhost:9334".parse().expect("static CORS origin must be valid"),
-                "http://127.0.0.1:9334".parse().expect("static CORS origin must be valid"),
-            ]))
+            .allow_origin(AllowOrigin::list([origin_localhost, origin_127]))
             .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE])
             .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE]));
 

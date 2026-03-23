@@ -54,6 +54,10 @@ const lastPong = new Map<string, number>();
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const STALE_THRESHOLD_MS = 90_000;
 
+// Max WebSocket message size — 1MB prevents memory exhaustion from
+// oversized payloads while allowing large snapshots through
+const MAX_MESSAGE_SIZE = 1024 * 1024;
+
 const heartbeatInterval = setInterval(() => {
   const now = Date.now();
   for (const [agentId, ws] of connectedAgentIds) {
@@ -67,6 +71,9 @@ const heartbeatInterval = setInterval(() => {
   }
 }, HEARTBEAT_INTERVAL_MS);
 
+// --- Dangerous URL schemes that should never be navigated to ---
+const BLOCKED_SCHEMES = ['javascript:', 'data:', 'file:', 'vbscript:'];
+
 // --- Message handling ---
 
 function send(ws: ServerWebSocket<unknown>, msg: OutgoingMessage): void {
@@ -75,6 +82,13 @@ function send(ws: ServerWebSocket<unknown>, msg: OutgoingMessage): void {
 
 async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise<void> {
   const state = clients.get(ws)!;
+
+  // #8: Message size limit
+  if (raw.length > MAX_MESSAGE_SIZE) {
+    send(ws, { type: 'error', code: 'message_too_large', message: 'Message exceeds 1MB limit' });
+    return;
+  }
+
   const msg = parseMessage(raw);
 
   if (!msg) {
@@ -109,6 +123,8 @@ async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise
 function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: string, agentId: string): void {
   const agentConfig = authenticate(config, token, agentId);
   if (!agentConfig) {
+    // #5: Log failed auth attempts for attack detection
+    audit.log({ agent_id: agentId || 'unknown', action: 'auth', ok: false, duration_ms: 0, error: 'auth_failed' });
     send(ws, { type: 'error', code: 'auth_failed', message: 'Invalid token or agent_id' });
     ws.close();
     return;
@@ -128,6 +144,7 @@ function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: str
   connectedAgentIds.set(agentId, ws);
   lastPong.set(agentId, Date.now());
   agentConnected(agentId);
+  audit.log({ agent_id: agentId, action: 'auth', ok: true, duration_ms: 0 });
   send(ws, { type: 'result', action: 'auth', ok: true });
 }
 
@@ -195,15 +212,37 @@ async function checkUrlRestrictions(
 
   if (!urlToCheck) return null;
 
+  // #17: Block dangerous URL schemes before allowlist/blocklist check
+  const lowerUrl = urlToCheck.toLowerCase().trim();
+  for (const scheme of BLOCKED_SCHEMES) {
+    if (lowerUrl.startsWith(scheme)) {
+      return { reason: `Blocked URL scheme: ${scheme}`, url: urlToCheck };
+    }
+  }
+
   const check = isAllowed(urlToCheck, agentCfg.allowlist, config.blocklist);
   if (check.allowed) return null;
   return { reason: check.reason || 'Site blocked', url: urlToCheck };
+}
+
+// #2: Validate screenshot path stays within expected directories
+function isValidScreenshotPath(filePath: string): boolean {
+  const resolved = path.resolve(filePath);
+  // Only allow paths under /tmp or the working directory
+  const cwd = process.cwd();
+  return resolved.startsWith('/tmp/') || resolved.startsWith(cwd + '/');
 }
 
 async function sendScreenshot(ws: ServerWebSocket<unknown>, engineOutput: string, reqId?: string): Promise<void> {
   // Engine returns formatted text like "✓ Screenshot saved to /path/file.png"
   const pathMatch = engineOutput.match(/\/\S+\.png/);
   const screenshotPath = pathMatch ? pathMatch[0] : engineOutput.trim();
+
+  if (!isValidScreenshotPath(screenshotPath)) {
+    console.error(`Screenshot path rejected (outside allowed directories): ${screenshotPath}`);
+    send(ws, { type: 'error', code: 'screenshot_error', message: 'Screenshot path outside allowed directory', request_id: reqId });
+    return;
+  }
 
   try {
     const buf = await Bun.file(screenshotPath).arrayBuffer();
@@ -233,6 +272,8 @@ const wsServer = Bun.serve({
     return new Response('Claw Relay™ WebSocket server', { status: 200 });
   },
   websocket: {
+    // #8: Cap incoming WebSocket frame size
+    maxPayloadLength: MAX_MESSAGE_SIZE,
     open(ws) {
       clients.set(ws, { authenticated: false });
     },
