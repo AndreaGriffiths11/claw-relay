@@ -123,7 +123,7 @@ if curl -s http://localhost:9222/json/version >/dev/null 2>&1; then
   echo "  ✓ Chrome already running with debugging on port 9222"
 else
   # Launch Chrome in background
-  "$CHROME_APP" --remote-debugging-port=9222 --user-data-dir="$CHROME_DATA" &
+  "$CHROME_APP" --remote-debugging-port=9222 --user-data-dir="$CHROME_DATA" --window-size=1920,1080 --window-position=0,0 &
   CHROME_PID=$!
   sleep 3
   if curl -s http://localhost:9222/json/version >/dev/null 2>&1; then
