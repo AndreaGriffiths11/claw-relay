@@ -1,3 +1,6 @@
+// Maps each browser action to the permission scope that gates it.
+// Scopes are coarse by design: four levels cover the full action surface
+// without requiring config changes every time we add an action.
 const SCOPE_MAP: Record<string, string> = {
   snapshot: 'read',
   screenshot: 'read',
@@ -12,12 +15,9 @@ const SCOPE_MAP: Record<string, string> = {
   evaluate: 'execute',
 };
 
-export function getRequiredScope(action: string): string | null {
-  return SCOPE_MAP[action] || null;
-}
-
-export function hasPermission(scopes: string[], action: string): boolean {
-  const required = getRequiredScope(action);
+export function hasPermission(scopes: readonly string[], action: string): boolean {
+  const required = SCOPE_MAP[action];
+  // Unknown actions are denied — fail closed
   if (!required) return false;
   return scopes.includes(required);
 }

@@ -1,35 +1,42 @@
+// URL allowlist/blocklist enforcement.
+// Blocklist always wins over allowlist — even if an agent's allowlist
+// includes a domain, a global blocklist entry blocks it.
+// Empty allowlist means "allow everything not blocked."
+
 export function matchesPattern(pattern: string, hostname: string): boolean {
   if (pattern === '*') return true;
 
-  // String matching (consistent with Rust implementation)
-  // Supports: exact match, *.example.com (subdomain wildcard)
+  // Wildcard subdomain: *.example.com matches example.com AND sub.example.com
   if (pattern.startsWith('*.')) {
-    const suffix = pattern.slice(1); // ".example.com"
-    return hostname === pattern.slice(2) || hostname.endsWith(suffix);
+    const baseDomain = pattern.slice(2);
+    return hostname === baseDomain || hostname.endsWith('.' + baseDomain);
   }
 
   return hostname === pattern;
 }
 
-export function isAllowed(url: string, allowlist: string[] | undefined, blocklist: string[] | undefined): { allowed: boolean; reason?: string } {
+export function isAllowed(
+  url: string,
+  allowlist: readonly string[] | undefined,
+  blocklist: readonly string[] | undefined,
+): { allowed: boolean; reason?: string } {
   let hostname: string;
   try {
-    const parsed = new URL(url);
-    hostname = parsed.hostname;
+    hostname = new URL(url).hostname;
   } catch {
     return { allowed: false, reason: 'Invalid URL' };
   }
 
-  // Global blocklist always wins
-  const effectiveBlocklist = blocklist || [];
-  for (const pattern of effectiveBlocklist) {
+  // Blocklist check runs first — blocked domains can never be overridden
+  for (const pattern of blocklist || []) {
     if (matchesPattern(pattern, hostname)) {
       return { allowed: false, reason: `${hostname} is blocked` };
     }
   }
 
-  // Check agent allowlist (no allowlist = allow all)
+  // No allowlist configured = allow everything not blocked
   if (!allowlist || allowlist.length === 0) return { allowed: true };
+
   for (const pattern of allowlist) {
     if (matchesPattern(pattern, hostname)) {
       return { allowed: true };
