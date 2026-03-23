@@ -40,11 +40,15 @@ interface ClientState {
   authenticated: boolean;
   agentId?: string;
   agentConfig?: AgentConfig;
+  authAttempts: number;
 }
 
 const clients = new WeakMap<object, ClientState>();
 const connectedAgentIds = new Map<string, ServerWebSocket<unknown>>();
 const lastPong = new Map<string, number>();
+
+// Max failed auth attempts per connection before forced disconnect
+const MAX_AUTH_ATTEMPTS = 5;
 
 // --- Heartbeat ---
 // Ping connected agents every 30s. If an agent hasn't ponged in 90s,
@@ -121,8 +125,17 @@ async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise
 }
 
 function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: string, agentId: string): void {
+  // Rate limit auth attempts — 5 failures per connection
+  if (state.authAttempts >= MAX_AUTH_ATTEMPTS) {
+    audit.log({ agent_id: agentId || 'unknown', action: 'auth', ok: false, duration_ms: 0, error: 'auth_rate_limited' });
+    send(ws, { type: 'error', code: 'rate_limited', message: 'Too many auth attempts' });
+    ws.close(4029, 'Too many auth attempts');
+    return;
+  }
+
   const agentConfig = authenticate(config, token, agentId);
   if (!agentConfig) {
+    state.authAttempts++;
     // #5: Log failed auth attempts for attack detection
     audit.log({ agent_id: agentId || 'unknown', action: 'auth', ok: false, duration_ms: 0, error: 'auth_failed' });
     send(ws, { type: 'error', code: 'auth_failed', message: 'Invalid token or agent_id' });
@@ -275,7 +288,7 @@ const wsServer = Bun.serve({
     // #8: Cap incoming WebSocket frame size
     maxPayloadLength: MAX_MESSAGE_SIZE,
     open(ws) {
-      clients.set(ws, { authenticated: false });
+      clients.set(ws, { authenticated: false, authAttempts: 0 });
     },
     message(ws, message) {
       const decoded = typeof message === 'string' ? message : new TextDecoder().decode(message);
