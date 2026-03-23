@@ -241,9 +241,10 @@ async function checkUrlRestrictions(
 // #2: Validate screenshot path stays within expected directories
 function isValidScreenshotPath(filePath: string): boolean {
   const resolved = path.resolve(filePath);
-  // Only allow paths under /tmp or the working directory
   const cwd = process.cwd();
-  return resolved.startsWith('/tmp/') || resolved.startsWith(cwd + '/');
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  const agentBrowserDir = homeDir ? path.join(homeDir, '.agent-browser') + '/' : '';
+  return resolved.startsWith('/tmp/') || resolved.startsWith(cwd + '/') || (agentBrowserDir && resolved.startsWith(agentBrowserDir));
 }
 
 async function sendScreenshot(ws: ServerWebSocket<unknown>, engineOutput: string, reqId?: string): Promise<void> {
