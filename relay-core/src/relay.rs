@@ -186,7 +186,7 @@ async fn authenticate_agent(
                 let _ = sender.send(Message::Text(
                     error_msg("auth_failed", "Invalid token or agent_id", None)
                 )).await;
-                return None;
+                continue;
             }
             Some(cfg) => cfg,
         };
