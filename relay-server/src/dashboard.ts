@@ -127,9 +127,10 @@ export function startDashboard(
 
   const app = new Hono();
 
-  // CORS restricted to localhost — dashboard is a local admin tool
+  // #9: CORS uses configured port, not hardcoded
+  const dashPort = config.dashboard.port;
   app.use('*', cors({
-    origin: ['http://localhost:9334', 'http://127.0.0.1:9334'],
+    origin: [`http://localhost:${dashPort}`, `http://127.0.0.1:${dashPort}`],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowHeaders: ['Authorization', 'Content-Type'],
   }));

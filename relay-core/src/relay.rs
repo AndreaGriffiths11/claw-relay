@@ -157,6 +157,13 @@ async fn authenticate_agent(
         let config = state.config.read().expect("config lock poisoned").clone();
         let agent_cfg = match authenticate(&config, token, agent_id) {
             None => {
+                // #5: Log failed auth for attack detection
+                state.audit.log(AuditEntry {
+                    timestamp: chrono::Utc::now().to_rfc3339(),
+                    agent_id: agent_id.to_string(), action: "auth".to_string(),
+                    target: None, ok: false, duration_ms: 0,
+                    error: Some("auth_failed".to_string()),
+                });
                 let _ = sender.send(Message::Text(
                     error_msg("auth_failed", "Invalid token or agent_id", None)
                 )).await;
@@ -174,6 +181,11 @@ async fn authenticate_agent(
         }
 
         state.agent_connected(agent_id);
+        state.audit.log(AuditEntry {
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            agent_id: agent_id.to_string(), action: "auth".to_string(),
+            target: None, ok: true, duration_ms: 0, error: None,
+        });
         let _ = sender.send(Message::Text(
             result_msg("auth", None, None, None)
         )).await;
@@ -366,6 +378,9 @@ async fn handle_action(
 // check the current page URL — prevents an agent from acting on
 // a blocked site it navigated to before the blocklist was updated.
 
+// #17: Dangerous URL schemes that should never be navigated to
+const BLOCKED_SCHEMES: &[&str] = &["javascript:", "data:", "file:", "vbscript:"];
+
 async fn check_url_restrictions(
     action: &str,
     parsed: &serde_json::Value,
@@ -374,6 +389,13 @@ async fn check_url_restrictions(
 ) -> Option<String> {
     if action == "navigate" {
         let url = parsed.get("url").and_then(|v| v.as_str())?;
+        // Block dangerous schemes before allowlist/blocklist
+        let lower_url = url.to_lowercase();
+        for scheme in BLOCKED_SCHEMES {
+            if lower_url.starts_with(scheme) {
+                return Some(format!("Blocked URL scheme: {}", scheme));
+            }
+        }
         let check = is_allowed(url, &agent_cfg.allowlist, &config.blocklist);
         if !check.allowed {
             return check.reason;
@@ -398,6 +420,15 @@ async fn check_url_restrictions(
 
 // ── Response Helpers ─────────────────────────────────────────────────
 
+// #2: Validate screenshot paths stay within /tmp or cwd
+fn is_valid_screenshot_path(file_path: &str) -> bool {
+    let resolved = std::path::Path::new(file_path).canonicalize().unwrap_or_default();
+    let resolved_str = resolved.to_string_lossy();
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let cwd_str = cwd.to_string_lossy();
+    resolved_str.starts_with("/tmp/") || resolved_str.starts_with(&*cwd_str)
+}
+
 async fn send_success(
     sender: &Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<WebSocket, Message>>>,
     action: &str,
@@ -408,6 +439,14 @@ async fn send_success(
     // so agents don't need filesystem access to the relay host
     if action == "screenshot" && !data.is_empty() {
         if let Some(path) = data.split_whitespace().find(|s| s.starts_with('/') && s.ends_with(".png")) {
+            if !is_valid_screenshot_path(path) {
+                eprintln!("Screenshot path rejected (outside allowed directories): {}", path);
+                let mut s = sender.lock().await;
+                let _ = s.send(Message::Text(
+                    error_msg("screenshot_error", "Screenshot path outside allowed directory", req_id)
+                )).await;
+                return;
+            }
             match tokio::fs::read(path).await {
                 Ok(bytes) => {
                     use base64::Engine as _;

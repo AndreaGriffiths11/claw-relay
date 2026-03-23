@@ -25,7 +25,7 @@ ws.send(JSON.stringify({
 The relay URL and token are provided by the user or set as environment variables:
 - `CLAW_RELAY_URL` — WebSocket URL (e.g. `wss://relay.example.com`)
 - `CLAW_RELAY_TOKEN` — agent auth token
-- `CLAW_RELAY_AGENT_ID` — your agent identifier
+- `CLAW_RELAY_AGENT` — your agent identifier
 
 ## Actions
 
@@ -43,7 +43,7 @@ After auth succeeds, send actions as JSON:
 | `select` | `interact` | `{"type": "select", "ref": "e7", "values": ["opt1"]}` |
 | `navigate` | `navigate` | `{"type": "navigate", "url": "https://..."}` |
 | `evaluate` | `execute` | `{"type": "evaluate", "js": "document.title"}` |
-| `close` | navigate | `{"type": "close"}` |
+| `close` | `navigate` | `{"type": "close"}` |
 
 ## Responses
 
