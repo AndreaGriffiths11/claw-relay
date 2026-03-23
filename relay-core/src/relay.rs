@@ -120,11 +120,15 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
 // ── Phase 1: Authentication ──────────────────────────────────────────
 
+const MAX_AUTH_ATTEMPTS: u32 = 5;
+
 async fn authenticate_agent(
     sender: &mut futures_util::stream::SplitSink<WebSocket, Message>,
     receiver: &mut futures_util::stream::SplitStream<WebSocket>,
     state: &Arc<AppState>,
 ) -> Option<(String, AgentConfig)> {
+    let mut auth_attempts: u32 = 0;
+
     while let Some(msg) = receiver.next().await {
         let text = match msg {
             Ok(Message::Text(t)) => t,
@@ -154,9 +158,24 @@ async fn authenticate_agent(
         let token = parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
         let agent_id = parsed.get("agent_id").and_then(|v| v.as_str()).unwrap_or("");
 
+        // Rate limit auth attempts per connection
+        if auth_attempts >= MAX_AUTH_ATTEMPTS {
+            state.audit.log(AuditEntry {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                agent_id: agent_id.to_string(), action: "auth".to_string(),
+                target: None, ok: false, duration_ms: 0,
+                error: Some("auth_rate_limited".to_string()),
+            });
+            let _ = sender.send(Message::Text(
+                error_msg("rate_limited", "Too many auth attempts", None)
+            )).await;
+            return None;
+        }
+
         let config = state.config.read().expect("config lock poisoned").clone();
         let agent_cfg = match authenticate(&config, token, agent_id) {
             None => {
+                auth_attempts += 1;
                 // #5: Log failed auth for attack detection
                 state.audit.log(AuditEntry {
                     timestamp: chrono::Utc::now().to_rfc3339(),

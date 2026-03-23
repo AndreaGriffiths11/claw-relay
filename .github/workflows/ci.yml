@@ -56,4 +56,4 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: node -e "require('./claw-relay-mcp.js')" || true
+      - run: node --check claw-relay-mcp.js
