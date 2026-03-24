@@ -1,7 +1,7 @@
 {
   "name": "claw-relay-server",
   "version": "0.1.0",
-  "description": "Trust layer between AI agents and agent-browser",
+  "description": "Trust layer between AI agents and Chrome",
   "main": "src/index.ts",
   "scripts": {
     "start": "bun src/index.ts",

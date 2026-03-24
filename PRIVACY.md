@@ -37,3 +37,9 @@ No user data is shared with or sold to third parties.
 ## Contact
 
 Questions? Open an issue at [github.com/AndreaGriffiths11/claw-relay](https://github.com/AndreaGriffiths11/claw-relay/issues).
+
+---
+
+## Relay Server — Local Audit Logging
+
+The Claw Relay server logs agent actions locally (timestamps, agent IDs, action types, target URLs) for security auditing. These logs stay on your machine — no data is sent externally. The relay server has no analytics, telemetry, or phone-home behavior.

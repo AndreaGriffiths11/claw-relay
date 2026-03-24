@@ -5,7 +5,7 @@ Claw Relay — open-source WebSocket relay giving AI agents secure access to a u
 
 ## Tech Stack
 - Bun / TypeScript (relay server)
-- Rust (relay core binary)
+- puppeteer-core (Chrome CDP integration)
 - Chrome Extension (Manifest V3)
 - WebSocket protocol (agent ↔ relay ↔ Chrome CDP)
 

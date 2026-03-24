@@ -4,6 +4,16 @@ The relay runs on your machine. If your agent is on the **same machine**, just u
 
 Tunnels make the relay reachable by **remote** agents.
 
+## Using start.sh
+
+`start.sh` has built-in tunnel support:
+
+```bash
+./start.sh                       # Cloudflare quick tunnel (default)
+./start.sh --tunnel none         # local only, no tunnel
+./start.sh --tunnel tailscale    # Tailscale serve
+```
+
 ## Option A: Cloudflare Quick Tunnel (easiest, temporary)
 
 No account needed. Good for testing.
@@ -41,15 +51,22 @@ Requires a domain on Cloudflare (free plan works).
 
 ## Option C: Tailscale
 
-If both machines are on the same tailnet, connect directly: `ws://<tailscale-ip>:9333`.
+If both machines are on the same tailnet:
 
-## Option D: ngrok
+- **Direct access** (no `tailscale serve`): `ws://<tailscale-ip>:9333`
+- **Via `tailscale serve`** (HTTPS proxy): `wss://<tailscale-hostname>/`
+
+`start.sh --tunnel tailscale` uses `tailscale serve` which proxies via HTTPS on port 443.
+
+## Option D: ngrok (manual)
+
+ngrok is not integrated into `start.sh` — run it alongside the relay:
 
 ```bash
 ngrok http 9333
 ```
 
-Connect via the provided `wss://xxxx.ngrok-free.app`.
+Connect via the provided `wss://xxxx.ngrok-free.app/`.
 
 ## Security
 

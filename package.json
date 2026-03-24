@@ -2,7 +2,7 @@
   "name": "claw-relay",
   "version": "0.1.0",
   "description": "Give your AI agents a real browser. Secure relay between AI agents and Chrome.",
-  "main": "relay-server/dist/index.js",
+  "main": "relay-server/src/index.ts",
   "bin": {
     "claw-relay": "relay-server/src/cli.ts"
   },
@@ -15,11 +15,14 @@
     "mcp/",
     "extension/",
     "docs/",
-    "assets/",
+    "start.sh",
     "LICENSE",
     "README.md",
     "SKILL.md"
   ],
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "scripts": {
     "build": "cd relay-server && bun run build",
     "start": "cd relay-server && bun start",

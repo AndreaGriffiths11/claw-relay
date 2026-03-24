@@ -32,7 +32,7 @@ For agents running on a different machine, use `start.sh` with a tunnel:
 
 ```bash
 ./start.sh                        # Cloudflare quick tunnel (default)
-./start.sh --no-tunnel            # local only
+./start.sh --tunnel none          # local only
 ./start.sh --tunnel tailscale     # Tailscale
 ```
 
