@@ -38,7 +38,19 @@ export function loadConfig(configPath: string): Config {
   return {
     server: parsed.server || { port: 9333, host: '127.0.0.1' },
     agents: parsed.agents || {},
-    blocklist: parsed.blocklist || [],
+    blocklist: [
+      // Hardcoded safety defaults — always blocked regardless of config
+      'mail.google.com',
+      'accounts.google.com',
+      '*.bank.com',
+      '*.bankofamerica.com',
+      '*.chase.com',
+      '*.wellsfargo.com',
+      '*.paypal.com',
+      '*.venmo.com',
+      // User-configured blocklist entries
+      ...(parsed.blocklist || []),
+    ],
     audit: parsed.audit || { logFile: './audit.jsonl', logToStdout: true },
     engine: parsed.engine || { timeout: 30_000 },
     dashboard: {
