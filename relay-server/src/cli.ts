@@ -156,7 +156,7 @@ async function launchChrome(): Promise<void> {
       // Gracefully quit Chrome, wait, relaunch with CDP flag
       try { execSync('osascript -e \'tell application "Google Chrome" to quit\'', { stdio: 'ignore' }); } catch {}
       // Wait for Chrome to fully quit
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 15; i++) {
         await new Promise(r => setTimeout(r, 1000));
         try {
           execSync('pgrep -x "Google Chrome"', { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -164,8 +164,9 @@ async function launchChrome(): Promise<void> {
           break; // Chrome is gone
         }
       }
-      // Relaunch with CDP — uses user's default profile (all tabs, logins, 1Password, etc.)
-      spawn('open', ['-a', 'Google Chrome', '--args', '--remote-debugging-port=9222'], {
+      await new Promise(r => setTimeout(r, 1000)); // extra buffer
+      // Relaunch with CDP using binary path directly (open --args doesn't reliably pass flags)
+      spawn(chromePath, ['--remote-debugging-port=9222'], {
         detached: true, stdio: 'ignore'
       }).unref();
     } else {
@@ -177,7 +178,7 @@ async function launchChrome(): Promise<void> {
     // No Chrome running at all — launch user's Chrome with CDP
     console.log('🌐 Launching Chrome with remote debugging...');
     if (platform === 'darwin') {
-      spawn('open', ['-a', 'Google Chrome', '--args', '--remote-debugging-port=9222'], {
+      spawn(chromePath, ['--remote-debugging-port=9222'], {
         detached: true, stdio: 'ignore'
       }).unref();
     } else {
