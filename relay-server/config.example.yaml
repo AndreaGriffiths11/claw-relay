@@ -25,7 +25,6 @@ audit:
   logToStdout: true
 
 engine:
-  binary: "agent-browser"
   timeout: 30000
 
 dashboard:

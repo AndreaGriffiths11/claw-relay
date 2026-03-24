@@ -7,10 +7,11 @@
     "start": "bun src/index.ts",
     "dev": "bun --watch src/index.ts",
     "build:dashboard": "cd dashboard && bun install && bun run build",
-    "prebuild": "bun run build:dashboard"
+    "build": "bun run build:dashboard"
   },
   "dependencies": {
     "hono": "^4.12.8",
+    "puppeteer-core": "^24.0.0",
     "typescript": "^5.9.3",
     "yaml": "^2.3.4"
   },

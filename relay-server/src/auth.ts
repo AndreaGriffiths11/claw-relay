@@ -14,7 +14,7 @@ export interface Config {
   agents: Record<string, AgentConfig>;
   blocklist: string[];
   audit: { logFile: string; logToStdout: boolean };
-  engine: { binary: string; timeout: number };
+  engine: { timeout: number };
   dashboard: { port: number; adminToken: string };
 }
 
@@ -40,7 +40,7 @@ export function loadConfig(configPath: string): Config {
     agents: parsed.agents || {},
     blocklist: parsed.blocklist || [],
     audit: parsed.audit || { logFile: './audit.jsonl', logToStdout: true },
-    engine: parsed.engine || { binary: 'agent-browser', timeout: 30_000 },
+    engine: parsed.engine || { timeout: 30_000 },
     dashboard: {
       port: parsed.dashboard?.port || 9334,
       adminToken: parsed.dashboard?.adminToken || '',
