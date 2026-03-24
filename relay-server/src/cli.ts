@@ -178,6 +178,7 @@ async function launchChrome(): Promise<void> {
   const child = spawn(chromePath, [
     '--remote-debugging-port=9222',
     `--user-data-dir=${defaultProfile}`,
+    '--profile-directory=Default',
     '--no-first-run',
     '--no-default-browser-check',
   ], { detached: true, stdio: 'ignore' });
