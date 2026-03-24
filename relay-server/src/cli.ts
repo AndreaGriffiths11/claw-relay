@@ -119,7 +119,7 @@ function findChrome(): string | null {
 let chromePid: number | undefined;
 
 async function launchChrome(): Promise<void> {
-  // Check if CDP is already available (user's Chrome or previous Claw Relay Chrome)
+  // Check if CDP is already available
   try {
     const res = await fetch('http://127.0.0.1:9222/json/version');
     if (res.ok) {
@@ -136,68 +136,45 @@ async function launchChrome(): Promise<void> {
   }
 
   const platform = process.platform;
+  const profileDir = platform === 'darwin'
+    ? `${process.env.HOME}/.claw-relay/chrome-data`
+    : platform === 'win32'
+      ? `${process.env.LOCALAPPDATA}\\.claw-relay\\chrome-data`
+      : `${process.env.HOME}/.claw-relay/chrome-data`;
 
-  // Check if user's Chrome is already running (without CDP)
-  const userChromeRunning = (() => {
+  // Check if Claw Relay Chrome is already running
+  const relayRunning = (() => {
     try {
-      if (platform === 'darwin') {
-        execSync('pgrep -x "Google Chrome"', { stdio: ['pipe', 'pipe', 'pipe'] });
-      } else {
-        execSync('pgrep -x chrome', { stdio: ['pipe', 'pipe', 'pipe'] });
-      }
+      execSync('pgrep -f "claw-relay/chrome-data"', { stdio: ['pipe', 'pipe', 'pipe'] });
       return true;
     } catch { return false; }
   })();
 
-  if (userChromeRunning) {
-    // User's Chrome is running but without CDP — relaunch it with the debug flag
-    console.log('🌐 Relaunching your Chrome with remote debugging...');
-    if (platform === 'darwin') {
-      // Gracefully quit Chrome, wait, relaunch with CDP flag
-      try { execSync('osascript -e \'tell application "Google Chrome" to quit\'', { stdio: 'ignore' }); } catch {}
-      // Wait for Chrome to fully quit
-      for (let i = 0; i < 15; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        try {
-          execSync('pgrep -x "Google Chrome"', { stdio: ['pipe', 'pipe', 'pipe'] });
-        } catch {
-          break; // Chrome is gone
-        }
+  if (relayRunning) {
+    // Already running — check CDP
+    try {
+      const res = await fetch('http://127.0.0.1:9222/json/version');
+      if (res.ok) {
+        console.log('🌐 Claw Relay Chrome already running — reusing');
+        return;
       }
-      await new Promise(r => setTimeout(r, 1000)); // extra buffer
-      // Relaunch with CDP using binary path directly (open --args doesn't reliably pass flags)
-      // Chrome requires --user-data-dir for CDP — use the real Chrome profile dir so user keeps everything
-      const chromeDataDir = `${process.env.HOME}/Library/Application Support/Google/Chrome`;
-      spawn(chromePath, [
-        '--remote-debugging-port=9222',
-        `--user-data-dir=${chromeDataDir}`,
-        '--no-first-run',
-        '--no-default-browser-check',
-      ], {
-        detached: true, stdio: 'ignore'
-      }).unref();
-    } else {
-      // Linux/Windows: can't easily restart user's Chrome, fall back to separate profile
-      console.log('   ⚠ Cannot relaunch — starting dedicated Claw Relay Chrome instead');
-      await launchDedicatedChrome(chromePath, platform);
-    }
-  } else {
-    // No Chrome running at all — launch user's Chrome with CDP
-    console.log('🌐 Launching Chrome with remote debugging...');
-    if (platform === 'darwin') {
-      const chromeDataDir = `${process.env.HOME}/Library/Application Support/Google/Chrome`;
-      spawn(chromePath, [
-        '--remote-debugging-port=9222',
-        `--user-data-dir=${chromeDataDir}`,
-        '--no-first-run',
-        '--no-default-browser-check',
-      ], {
-        detached: true, stdio: 'ignore'
-      }).unref();
-    } else {
-      await launchDedicatedChrome(chromePath, platform);
-    }
+    } catch {}
+    // Stale — kill and relaunch
+    console.log('🌐 Chrome stale — restarting...');
+    try { execSync('pkill -f "claw-relay/chrome-data"', { stdio: 'ignore' }); } catch {}
+    await new Promise(r => setTimeout(r, 2000));
   }
+
+  console.log('🌐 Launching Claw Relay Chrome...');
+  const child = spawn(chromePath, [
+    '--remote-debugging-port=9222',
+    `--user-data-dir=${profileDir}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+  ], { detached: true, stdio: 'ignore' });
+
+  child.unref();
+  chromePid = child.pid;
 
   // Wait for CDP
   for (let i = 0; i < 30; i++) {
@@ -213,26 +190,6 @@ async function launchChrome(): Promise<void> {
   }
   console.error('✗ Chrome failed to start with CDP.');
   process.exit(1);
-}
-
-async function launchDedicatedChrome(chromePath: string, platform: string): Promise<void> {
-  const profileDir = platform === 'darwin'
-    ? `${process.env.HOME}/.claw-relay/chrome-data`
-    : platform === 'win32'
-      ? `${process.env.LOCALAPPDATA}\\.claw-relay\\chrome-data`
-      : `${process.env.HOME}/.claw-relay/chrome-data`;
-
-  const child = spawn(chromePath, [
-    '--remote-debugging-port=9222',
-    `--user-data-dir=${profileDir}`,
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--window-size=1920,1080',
-    '--window-position=100,50',
-  ], { detached: true, stdio: 'ignore' });
-
-  child.unref();
-  chromePid = child.pid;
 }
 
 // --- Main ---
