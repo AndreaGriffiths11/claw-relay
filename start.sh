@@ -34,25 +34,7 @@ if [ -n "$MISSING" ]; then
   exit 1
 fi
 
-# Step 1: Check dependencies
-if ! command -v agent-browser >/dev/null 2>&1; then
-  echo "⚙ agent-browser not found — installing via cargo..."
-  if command -v cargo >/dev/null 2>&1; then
-    cargo install agent-browser
-    echo "  ✓ agent-browser installed"
-  else
-    echo "✗ agent-browser requires Rust. Install Rust first: https://rustup.rs"
-    exit 1
-  fi
-fi
-if ! command -v bun >/dev/null 2>&1; then
-  echo "⚙ bun not found — installing..."
-  curl -fsSL https://bun.sh/install | bash
-  export PATH="$HOME/.bun/bin:$PATH"
-  echo "  ✓ bun installed"
-fi
-
-# Step 2: Check if config exists
+# Step 4: Launch Chrome with remote debugging
 if [ ! -f "$RELAY_DIR/config.yaml" ]; then
   echo ""
   echo "✗ No config.yaml found."
@@ -134,12 +116,7 @@ else
   fi
 fi
 
-# Step 5: Connect agent-browser
-echo "🔗 Connecting agent-browser to Chrome..."
-agent-browser connect http://localhost:9222
-echo "  ✓ Connected"
-
-# Step 6: Start relay server
+# Step 5: Start relay server
 echo "📡 Starting relay server..."
 cd "$RELAY_DIR"
 bun src/index.ts config.yaml &
@@ -148,7 +125,7 @@ sleep 1
 echo "  ✓ Relay running (PID $RELAY_PID)"
 echo "  Dashboard: http://localhost:9334"
 
-# Step 7: Optional tunnel
+# Step 6: Optional tunnel
 case $TUNNEL in
   cloudflare)
     echo "☁️  Starting Cloudflare tunnel..."

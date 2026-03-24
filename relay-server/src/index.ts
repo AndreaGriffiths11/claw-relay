@@ -32,7 +32,7 @@ export function getConfigPath(): string {
 
 const rateLimiter = new RateLimiter();
 const audit = new AuditLogger(config.audit.logFile, config.audit.logToStdout);
-const engine = new Engine(config.engine.binary, config.engine.timeout);
+const engine = new Engine(config.engine.timeout);
 
 // --- Connection tracking ---
 
@@ -203,9 +203,9 @@ async function handleAction(ws: ServerWebSocket<unknown>, state: ClientState, ms
     return;
   }
 
-  // Screenshots get tunneled as base64 so agents don't need filesystem access
+  // Screenshots come as base64 directly from the engine
   if (msg.type === 'screenshot' && result.data) {
-    await sendScreenshot(ws, result.data, reqId);
+    send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, mimeType: 'image/png', request_id: reqId });
   } else {
     send(ws, { type: 'result', action: msg.type, ok: true, data: result.data, request_id: reqId });
   }
@@ -238,43 +238,7 @@ async function checkUrlRestrictions(
   return { reason: check.reason || 'Site blocked', url: urlToCheck };
 }
 
-// #2: Validate screenshot path stays within expected directories
-function isValidScreenshotPath(filePath: string): boolean {
-  const resolved = path.resolve(filePath);
-  const cwd = process.cwd();
-  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-  const agentBrowserDir = homeDir ? path.join(homeDir, '.agent-browser') + '/' : '';
-  return resolved.startsWith('/tmp/') || resolved.startsWith(cwd + '/') || (!!agentBrowserDir && resolved.startsWith(agentBrowserDir));
-}
 
-async function sendScreenshot(ws: ServerWebSocket<unknown>, engineOutput: string, reqId?: string): Promise<void> {
-  // Engine returns formatted text like "✓ Screenshot saved to /path/file.png"
-  const pathMatch = engineOutput.match(/\/\S+\.png/);
-  const screenshotPath = pathMatch ? pathMatch[0] : engineOutput.trim();
-
-  if (!isValidScreenshotPath(screenshotPath)) {
-    console.error(`Screenshot path rejected (outside allowed directories): ${screenshotPath}`);
-    send(ws, { type: 'error', code: 'screenshot_error', message: 'Screenshot path outside allowed directory', request_id: reqId });
-    return;
-  }
-
-  try {
-    const buf = await Bun.file(screenshotPath).arrayBuffer();
-    send(ws, {
-      type: 'result',
-      action: 'screenshot',
-      ok: true,
-      data: Buffer.from(buf).toString('base64'),
-      mimeType: 'image/png',
-      request_id: reqId,
-    });
-  } catch (e: unknown) {
-    // File read failed — fall back to raw engine output
-    const errMsg = e instanceof Error ? e.message : String(e);
-    console.error(`Screenshot tunnel error: ${errMsg} (path: ${screenshotPath})`);
-    send(ws, { type: 'result', action: 'screenshot', ok: true, data: engineOutput, request_id: reqId });
-  }
-}
 
 // --- WebSocket server ---
 
