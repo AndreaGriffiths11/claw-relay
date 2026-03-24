@@ -247,12 +247,33 @@ export function startDashboard(
     return c.json({ ok: true });
   });
 
-  // Fallback — no SPA, just a status page
-  app.get('*', (c) => {
-    return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0a0a0f;color:#e2e8f0">
-      <div style="text-align:center"><h1>🦞 Claw Relay™ Dashboard</h1><p style="color:#94a3b8">Use the API with Bearer token auth. See <a href="https://github.com/AndreaGriffiths11/claw-relay/blob/main/docs/dashboard.md" style="color:#06b6d4">docs/dashboard.md</a></p></div>
-    </body></html>`);
-  });
+  // Serve built SPA from dashboard/dist, fall back to status page
+  const distDir = path.join(__dirname, '..', 'dashboard', 'dist');
+  const distExists = fs.existsSync(path.join(distDir, 'index.html'));
+
+  if (distExists) {
+    // Serve static assets (JS, CSS, etc.)
+    app.get('/assets/*', async (c) => {
+      const filePath = path.join(distDir, c.req.path);
+      try {
+        const file = Bun.file(filePath);
+        if (await file.exists()) return new Response(file);
+      } catch {}
+      return c.notFound();
+    });
+
+    // SPA fallback — serve index.html for all non-API routes
+    app.get('*', (c) => {
+      return new Response(Bun.file(path.join(distDir, 'index.html')));
+    });
+  } else {
+    // No built dashboard — show simple status page
+    app.get('*', (c) => {
+      return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0a0a0f;color:#e2e8f0">
+        <div style="text-align:center"><h1>🦞 Claw Relay™ Dashboard</h1><p style="color:#94a3b8">Run <code style="color:#06b6d4">cd dashboard && bun run build</code> to enable the full dashboard UI.</p></div>
+      </body></html>`);
+    });
+  }
 
   Bun.serve({ port: config.dashboard.port, fetch: app.fetch });
   console.log(`Dashboard on http://localhost:${config.dashboard.port}`);
