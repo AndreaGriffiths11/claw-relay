@@ -119,11 +119,12 @@ function findChrome(): string | null {
 let chromePid: number | undefined;
 
 async function launchChrome(): Promise<void> {
-  // Check if CDP is already running
+  // Check if CDP is already available (user's Chrome or previous Claw Relay Chrome)
   try {
     const res = await fetch('http://127.0.0.1:9222/json/version');
     if (res.ok) {
-      console.log('🌐 Chrome already running with CDP on port 9222');
+      const info = await res.json() as any;
+      console.log(`🌐 Connected to existing Chrome (${info.Browser || 'unknown'})`);
       return;
     }
   } catch {}
@@ -134,42 +135,78 @@ async function launchChrome(): Promise<void> {
     process.exit(1);
   }
 
-  // Use a persistent dedicated profile — not the user's main Chrome profile
-  // (can't share with an already-running Chrome) but logins persist between runs
   const platform = process.platform;
+
+  // Check if user's Chrome is already running (without CDP)
+  const userChromeRunning = (() => {
+    try {
+      if (platform === 'darwin') {
+        execSync('pgrep -x "Google Chrome"', { stdio: ['pipe', 'pipe', 'pipe'] });
+      } else {
+        execSync('pgrep -x chrome', { stdio: ['pipe', 'pipe', 'pipe'] });
+      }
+      return true;
+    } catch { return false; }
+  })();
+
+  if (userChromeRunning) {
+    // User's Chrome is running but without CDP — relaunch it with the debug flag
+    console.log('🌐 Relaunching your Chrome with remote debugging...');
+    if (platform === 'darwin') {
+      // Gracefully quit Chrome, wait, relaunch with CDP flag
+      try { execSync('osascript -e \'tell application "Google Chrome" to quit\'', { stdio: 'ignore' }); } catch {}
+      // Wait for Chrome to fully quit
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          execSync('pgrep -x "Google Chrome"', { stdio: ['pipe', 'pipe', 'pipe'] });
+        } catch {
+          break; // Chrome is gone
+        }
+      }
+      // Relaunch with CDP — uses user's default profile (all tabs, logins, 1Password, etc.)
+      spawn('open', ['-a', 'Google Chrome', '--args', '--remote-debugging-port=9222'], {
+        detached: true, stdio: 'ignore'
+      }).unref();
+    } else {
+      // Linux/Windows: can't easily restart user's Chrome, fall back to separate profile
+      console.log('   ⚠ Cannot relaunch — starting dedicated Claw Relay Chrome instead');
+      await launchDedicatedChrome(chromePath, platform);
+    }
+  } else {
+    // No Chrome running at all — launch user's Chrome with CDP
+    console.log('🌐 Launching Chrome with remote debugging...');
+    if (platform === 'darwin') {
+      spawn('open', ['-a', 'Google Chrome', '--args', '--remote-debugging-port=9222'], {
+        detached: true, stdio: 'ignore'
+      }).unref();
+    } else {
+      await launchDedicatedChrome(chromePath, platform);
+    }
+  }
+
+  // Wait for CDP
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const res = await fetch('http://127.0.0.1:9222/json/version');
+      if (res.ok) {
+        const info = await res.json() as any;
+        console.log(`   ✓ Chrome ready (${info.Browser || 'unknown'})`);
+        return;
+      }
+    } catch {}
+  }
+  console.error('✗ Chrome failed to start with CDP.');
+  process.exit(1);
+}
+
+async function launchDedicatedChrome(chromePath: string, platform: string): Promise<void> {
   const profileDir = platform === 'darwin'
     ? `${process.env.HOME}/.claw-relay/chrome-data`
     : platform === 'win32'
       ? `${process.env.LOCALAPPDATA}\\.claw-relay\\chrome-data`
       : `${process.env.HOME}/.claw-relay/chrome-data`;
-
-  // Check if Chrome is already running
-  const chromeRunning = (() => {
-    try {
-      execSync(
-        platform === 'darwin' ? 'pgrep -f "claw-relay/chrome-data"' : 'pgrep -f "claw-relay/chrome-data"',
-        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
-      );
-      return true;
-    } catch { return false; }
-  })();
-
-  if (chromeRunning) {
-    // Chrome already up with our profile — check if CDP is responsive
-    try {
-      const res = await fetch('http://127.0.0.1:9222/json/version');
-      if (res.ok) {
-        console.log('🌐 Chrome already running — reusing existing instance');
-        return;
-      }
-    } catch {}
-    // CDP not responding — kill stale Chrome and relaunch
-    console.log('🌐 Chrome stale — restarting...');
-    try { execSync('pkill -f "claw-relay/chrome-data"', { stdio: 'ignore' }); } catch {}
-    await new Promise(r => setTimeout(r, 2000));
-  } else {
-    console.log('🌐 Launching Chrome...');
-  }
 
   const child = spawn(chromePath, [
     '--remote-debugging-port=9222',
@@ -182,62 +219,6 @@ async function launchChrome(): Promise<void> {
 
   child.unref();
   chromePid = child.pid;
-
-  // Resize window via CDP (targets the correct Chrome, not the user's)
-  // Wait for CDP to be ready first, then resize
-  const resizeWindow = async () => {
-    try {
-      const listRes = await fetch('http://127.0.0.1:9222/json/list');
-      const targets = await listRes.json() as any[];
-      const page = targets.find((t: any) => t.type === 'page');
-      if (!page) return;
-
-      // Use CDP Browser.getWindowForTarget + Browser.setWindowBounds
-      const wsUrl = page.webSocketDebuggerUrl;
-      const WebSocket = (await import('ws')).default;
-      const ws = new WebSocket(wsUrl);
-      await new Promise<void>((resolve) => {
-        ws.on('open', () => {
-          // First get the window ID
-          ws.send(JSON.stringify({ id: 1, method: 'Browser.getWindowForTarget' }));
-        });
-        ws.on('message', (data: any) => {
-          const msg = JSON.parse(data.toString());
-          if (msg.id === 1 && msg.result?.windowId) {
-            // Now resize it
-            ws.send(JSON.stringify({
-              id: 2,
-              method: 'Browser.setWindowBounds',
-              params: {
-                windowId: msg.result.windowId,
-                bounds: { left: 50, top: 50, width: 1400, height: 900, windowState: 'normal' }
-              }
-            }));
-          }
-          if (msg.id === 2) {
-            ws.close();
-            resolve();
-          }
-        });
-        setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 5000);
-      });
-    } catch {}
-  };
-
-  // Wait for CDP
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    try {
-      const res = await fetch('http://127.0.0.1:9222/json/version');
-      if (res.ok) {
-        console.log(`   ✓ Chrome ready (PID ${chromePid})`);
-        await resizeWindow();
-        return;
-      }
-    } catch {}
-  }
-  console.error('✗ Chrome failed to start with CDP.');
-  process.exit(1);
 }
 
 // --- Main ---
@@ -280,14 +261,8 @@ async function main() {
   }
 }
 
-// Cleanup
-process.on('SIGINT', () => {
-  if (chromePid) try { process.kill(chromePid); } catch {}
-  process.exit(0);
-});
-process.on('SIGTERM', () => {
-  if (chromePid) try { process.kill(chromePid); } catch {}
-  process.exit(0);
-});
+// Cleanup — don't kill Chrome (it's the user's browser)
+process.on('SIGINT', () => { process.exit(0); });
+process.on('SIGTERM', () => { process.exit(0); });
 
 main().catch(e => { console.error(e); process.exit(1); });
