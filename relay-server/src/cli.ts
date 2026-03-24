@@ -155,8 +155,16 @@ async function launchChrome(): Promise<void> {
   })();
 
   if (chromeRunning) {
-    // Kill only the Claw Relay Chrome, not the user's main Chrome
-    console.log('🌐 Restarting Claw Relay Chrome...');
+    // Chrome already up with our profile — check if CDP is responsive
+    try {
+      const res = await fetch('http://127.0.0.1:9222/json/version');
+      if (res.ok) {
+        console.log('🌐 Chrome already running — reusing existing instance');
+        return;
+      }
+    } catch {}
+    // CDP not responding — kill stale Chrome and relaunch
+    console.log('🌐 Chrome stale — restarting...');
     try { execSync('pkill -f "claw-relay/chrome-data"', { stdio: 'ignore' }); } catch {}
     await new Promise(r => setTimeout(r, 2000));
   } else {
