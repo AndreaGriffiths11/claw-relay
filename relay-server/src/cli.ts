@@ -222,24 +222,26 @@ async function main() {
   // Start the server
   await import('./index');
 
-  // Banner
-  const agentToken = (globalThis as any).__generatedAgentToken;
-  const adminToken = (globalThis as any).__generatedAdminToken;
+  // Only show banner when running standalone (not via start.sh)
+  if (process.env.CLAW_RELAY_NO_BANNER !== '1') {
+    const agentToken = (globalThis as any).__generatedAgentToken;
+    const adminToken = (globalThis as any).__generatedAdminToken;
 
-  console.log('');
-  console.log('🦞 ═══════════════════════════════════════════');
-  console.log('   Claw Relay is live!');
-  console.log('');
-  console.log(`   WebSocket:  ws://localhost:${serverPort}`);
-  console.log(`   Dashboard:  http://localhost:${dashPort}`);
-  if (agentToken) {
     console.log('');
-    console.log(`   Agent token:  ${agentToken}`);
-    console.log(`   Admin token:  ${adminToken}`);
-    console.log('   (saved in config.yaml — change before exposing)');
+    console.log('🦞 ═══════════════════════════════════════════');
+    console.log('   Claw Relay is live!');
+    console.log('');
+    console.log(`   WebSocket:  ws://localhost:${serverPort}`);
+    console.log(`   Dashboard:  http://localhost:${dashPort}`);
+    if (agentToken) {
+      console.log('');
+      console.log(`   Agent token:  ${agentToken}`);
+      console.log(`   Admin token:  ${adminToken}`);
+      console.log('   (saved in config.yaml — change before exposing)');
+    }
+    console.log('═══════════════════════════════════════════════');
+    console.log('');
   }
-  console.log('═══════════════════════════════════════════════');
-  console.log('');
 }
 
 // Cleanup

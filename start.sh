@@ -49,7 +49,7 @@ fi
 
 # Start relay (handles Chrome + server + auto-config)
 cd relay-server
-bun src/cli.ts $EXTRA_ARGS &
+CLAW_RELAY_NO_BANNER=1 bun src/cli.ts $EXTRA_ARGS &
 RELAY_PID=$!
 cd ..
 
