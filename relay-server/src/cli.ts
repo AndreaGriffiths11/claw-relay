@@ -171,6 +171,8 @@ async function launchChrome(): Promise<void> {
     `--user-data-dir=${profileDir}`,
     '--no-first-run',
     '--no-default-browser-check',
+    '--window-size=1400,900',
+    '--window-position=100,100',
   ], { detached: true, stdio: 'ignore' });
 
   child.unref();
