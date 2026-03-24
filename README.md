@@ -12,7 +12,11 @@ Give your AI agents a real browser.
 bunx claw-relay
 ```
 
-That's it. Launches Chrome, starts the relay, generates config with random tokens.
+Launches a dedicated Chrome window, starts the relay, generates config with random tokens. One command, zero setup.
+
+**First time:** Sign into GitHub (or any site) in the Claw Relay Chrome window. Logins persist between restarts.
+
+**Restart:** `Ctrl+C` stops the relay. Chrome stays open. Run `bunx claw-relay` again — it reconnects without relaunching Chrome.
 
 ## What It Does
 
@@ -42,10 +46,10 @@ See [MCP docs](docs/mcp.md) for details.
 
 ## Chrome Extension
 
-Optional toolbar dashboard showing connection status and recent actions.
+Optional — lets your agent use your normal Chrome instead of the dedicated window:
 
 1. `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
-2. Click the icon for live status
+2. Click the toolbar icon on any tab to share it with the relay
 
 ## Configuration
 
@@ -91,10 +95,6 @@ bunx claw-relay [options]
 | [Dashboard](docs/dashboard.md) | Web UI for monitoring |
 | [Tunnels](docs/tunnels.md) | Remote access |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
-
-## Advanced: Rust Implementation
-
-Single-binary alternative with no runtime dependencies: [claw-relay-core](https://github.com/AndreaGriffiths11/claw-relay-core)
 
 ## License
 

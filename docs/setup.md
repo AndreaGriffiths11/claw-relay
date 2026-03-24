@@ -8,33 +8,39 @@ bunx claw-relay
 
 On first run, this will:
 1. Generate `config.yaml` with random tokens
-2. Launch Chrome with remote debugging (CDP)
+2. Launch a dedicated Chrome window with remote debugging
 3. Start the relay server + dashboard
 4. Print connection info
 
-## Manual Setup
+The Chrome window uses a dedicated profile at `~/.claw-relay/chrome-data/`. Your normal Chrome stays untouched.
 
-### Prerequisites
+**First time only:** Sign into any sites you want your agent to access (GitHub, etc.) in the Claw Relay Chrome window. Logins persist between restarts.
 
-```bash
-curl -fsSL https://bun.sh/install | bash   # Bun runtime
-brew install cloudflared                   # remote access (optional)
-```
-
-### 1. Install Dependencies
+## Restarting
 
 ```bash
-cd relay-server
-bun install
+# Ctrl+C stops the relay server
+# Chrome stays open — tabs, logins preserved
+
+bunx claw-relay
+# Detects running Chrome, reconnects without relaunching
 ```
 
-### 2. Configure
+## Remote Access (Tunnels)
+
+For agents running on a different machine, use `start.sh` with a tunnel:
 
 ```bash
-cp config.example.yaml config.yaml
+./start.sh                        # Cloudflare quick tunnel (default)
+./start.sh --no-tunnel            # local only
+./start.sh --tunnel tailscale     # Tailscale
 ```
 
-Edit `config.yaml`:
+See [Tunnels](tunnels.md) for more options.
+
+## Configuration
+
+Auto-generated on first run. Edit `config.yaml` to customize:
 
 ```yaml
 server:
@@ -43,15 +49,13 @@ server:
 
 agents:
   my-agent:
-    token: "pick-a-strong-secret"
-    scopes: ["read"]
-    allowlist: ["github.com"]
-    rateLimit: 30
+    token: "crly_..."              # auto-generated
+    scopes: ["read", "navigate", "interact"]
+    allowlist: ["github.com"]      # where the agent can go
+    rateLimit: 30                  # actions per minute
 
 blocklist:
-  - "*.bank.com"
-  - "mail.google.com"
-  - "accounts.google.com"
+  - "*.bank.com"                   # always blocked for all agents
 
 engine:
   timeout: 30000
@@ -61,46 +65,40 @@ dashboard:
   adminToken: "your-secret-admin-token"
 ```
 
-### 3. Launch Chrome with Remote Debugging
+## CLI Options
 
-```bash
-# macOS:
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+```
+bunx claw-relay [options]
 
-# Linux:
-google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+  --port <number>    Server port (default: 9333)
+  --config <path>    Custom config path
+  --no-chrome        Skip Chrome launch (use if Chrome is already running with CDP)
 ```
 
-### 4. Start the Relay
+## Chrome Extension (Optional)
 
-```bash
-cd relay-server
-bun src/index.ts config.yaml
-```
+For accessing your normal Chrome instead of the dedicated window:
 
-### 5. Test It
+1. `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
+2. Click the toolbar icon on any tab to share it with the relay
+
+No CDP flag needed — the extension bridges directly.
+
+## Test Connection
 
 ```bash
 node -e "
 const WebSocket = require('ws');
 const ws = new WebSocket('ws://127.0.0.1:9333');
-ws.on('open', () => ws.send(JSON.stringify({type:'auth',token:'pick-a-strong-secret',agent_id:'my-agent'})));
+ws.on('open', () => ws.send(JSON.stringify({type:'auth',token:'YOUR_TOKEN',agent_id:'default'})));
 ws.on('message', d => {
   const m = JSON.parse(d.toString());
   console.log(JSON.stringify(m, null, 2));
   if (m.action === 'auth') ws.send(JSON.stringify({type:'snapshot'}));
   else ws.close();
 });
-ws.on('close', () => process.exit(0));
 "
 ```
-
-## Chrome Extension
-
-1. Open `chrome://extensions` → Developer mode
-2. Load unpacked → select `extension/`
-3. Click icon to configure relay URL and API key
 
 ## Rate Limiting
 
