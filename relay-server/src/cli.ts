@@ -166,7 +166,14 @@ async function launchChrome(): Promise<void> {
       }
       await new Promise(r => setTimeout(r, 1000)); // extra buffer
       // Relaunch with CDP using binary path directly (open --args doesn't reliably pass flags)
-      spawn(chromePath, ['--remote-debugging-port=9222', '--no-first-run', '--no-default-browser-check', '--profile-directory=Default'], {
+      // Chrome requires --user-data-dir for CDP — use the real Chrome profile dir so user keeps everything
+      const chromeDataDir = `${process.env.HOME}/Library/Application Support/Google/Chrome`;
+      spawn(chromePath, [
+        '--remote-debugging-port=9222',
+        `--user-data-dir=${chromeDataDir}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+      ], {
         detached: true, stdio: 'ignore'
       }).unref();
     } else {
@@ -178,7 +185,13 @@ async function launchChrome(): Promise<void> {
     // No Chrome running at all — launch user's Chrome with CDP
     console.log('🌐 Launching Chrome with remote debugging...');
     if (platform === 'darwin') {
-      spawn(chromePath, ['--remote-debugging-port=9222', '--no-first-run', '--no-default-browser-check', '--profile-directory=Default'], {
+      const chromeDataDir = `${process.env.HOME}/Library/Application Support/Google/Chrome`;
+      spawn(chromePath, [
+        '--remote-debugging-port=9222',
+        `--user-data-dir=${chromeDataDir}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+      ], {
         detached: true, stdio: 'ignore'
       }).unref();
     } else {
