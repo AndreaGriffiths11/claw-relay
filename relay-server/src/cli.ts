@@ -170,17 +170,7 @@ async function launchChrome(): Promise<void> {
     '--no-default-browser-check',
     '--window-size=1920,1080',
     '--window-position=100,50',
-  ], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
-
-  // Log Chrome stderr for debugging
-  if (child.stderr) {
-    child.stderr.on('data', (data: Buffer) => {
-      const msg = data.toString().trim();
-      if (msg && !msg.includes('DevTools listening')) {
-        console.log(`   Chrome: ${msg.slice(0, 200)}`);
-      }
-    });
-  }
+  ], { detached: true, stdio: 'ignore' });
 
   child.unref();
   chromePid = child.pid;

@@ -75,10 +75,17 @@ case $TUNNEL in
     if [ -n "$URL" ]; then
       WS_URL=$(echo "$URL" | sed 's|https://|wss://|')
       echo ""
-      echo "   Remote: $WS_URL"
+      echo ""
+      echo "🦞 ═══════════════════════════════════════════"
+      echo "   Claw Relay is live!"
+      echo ""
+      echo "   Local:      ws://localhost:$PORT"
+      echo "   Remote:     $WS_URL"
+      echo "   Dashboard:  http://localhost:$((PORT + 1))"
       echo ""
       echo "   Connect your agent:"
       echo "   RELAY_URL=$WS_URL"
+      echo "═══════════════════════════════════════════════"
       echo ""
     else
       echo "  ⚠ Tunnel started but URL not detected. Check: cat $TUNNEL_LOG"
@@ -89,7 +96,15 @@ case $TUNNEL in
     tailscale serve --bg "$PORT"
     ;;
   none)
-    echo "   No tunnel (local only)"
+    echo ""
+    echo ""
+    echo "🦞 ═══════════════════════════════════════════"
+    echo "   Claw Relay is live!"
+    echo ""
+    echo "   Local:      ws://localhost:$PORT"
+    echo "   Dashboard:  http://localhost:$((PORT + 1))"
+    echo "═══════════════════════════════════════════════"
+    echo ""
     ;;
 esac
 
