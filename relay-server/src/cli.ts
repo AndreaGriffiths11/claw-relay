@@ -175,19 +175,46 @@ async function launchChrome(): Promise<void> {
   child.unref();
   chromePid = child.pid;
 
-  // Bring to front and resize on macOS
-  if (platform === 'darwin') {
-    setTimeout(() => {
-      try {
-        execSync(`osascript -e '
-          tell application "Google Chrome"
-            activate
-            set bounds of front window to {0, 0, 1920, 1080}
-          end tell
-        '`, { stdio: 'ignore' });
-      } catch {}
-    }, 3000);
-  }
+  // Resize window via CDP (targets the correct Chrome, not the user's)
+  // Wait for CDP to be ready first, then resize
+  const resizeWindow = async () => {
+    try {
+      const listRes = await fetch('http://127.0.0.1:9222/json/list');
+      const targets = await listRes.json() as any[];
+      const page = targets.find((t: any) => t.type === 'page');
+      if (!page) return;
+
+      // Use CDP Browser.getWindowForTarget + Browser.setWindowBounds
+      const wsUrl = page.webSocketDebuggerUrl;
+      const WebSocket = (await import('ws')).default;
+      const ws = new WebSocket(wsUrl);
+      await new Promise<void>((resolve) => {
+        ws.on('open', () => {
+          // First get the window ID
+          ws.send(JSON.stringify({ id: 1, method: 'Browser.getWindowForTarget' }));
+        });
+        ws.on('message', (data: any) => {
+          const msg = JSON.parse(data.toString());
+          if (msg.id === 1 && msg.result?.windowId) {
+            // Now resize it
+            ws.send(JSON.stringify({
+              id: 2,
+              method: 'Browser.setWindowBounds',
+              params: {
+                windowId: msg.result.windowId,
+                bounds: { left: 50, top: 50, width: 1400, height: 900, windowState: 'normal' }
+              }
+            }));
+          }
+          if (msg.id === 2) {
+            ws.close();
+            resolve();
+          }
+        });
+        setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 5000);
+      });
+    } catch {}
+  };
 
   // Wait for CDP
   for (let i = 0; i < 30; i++) {
@@ -196,6 +223,7 @@ async function launchChrome(): Promise<void> {
       const res = await fetch('http://127.0.0.1:9222/json/version');
       if (res.ok) {
         console.log(`   ✓ Chrome ready (PID ${chromePid})`);
+        await resizeWindow();
         return;
       }
     } catch {}

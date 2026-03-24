@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/ws": "^8.18.1",
     "bun-types": "^1.3.11"
   }
 }
