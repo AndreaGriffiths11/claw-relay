@@ -168,6 +168,8 @@ async function launchChrome(): Promise<void> {
     `--user-data-dir=${profileDir}`,
     '--no-first-run',
     '--no-default-browser-check',
+    '--window-size=1920,1080',
+    '--window-position=100,50',
   ], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
 
   // Log Chrome stderr for debugging
