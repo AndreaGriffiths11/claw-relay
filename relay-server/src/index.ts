@@ -244,7 +244,7 @@ function isValidScreenshotPath(filePath: string): boolean {
   const cwd = process.cwd();
   const homeDir = process.env.HOME || process.env.USERPROFILE || '';
   const agentBrowserDir = homeDir ? path.join(homeDir, '.agent-browser') + '/' : '';
-  return resolved.startsWith('/tmp/') || resolved.startsWith(cwd + '/') || (agentBrowserDir && resolved.startsWith(agentBrowserDir));
+  return resolved.startsWith('/tmp/') || resolved.startsWith(cwd + '/') || (!!agentBrowserDir && resolved.startsWith(agentBrowserDir));
 }
 
 async function sendScreenshot(ws: ServerWebSocket<unknown>, engineOutput: string, reqId?: string): Promise<void> {
