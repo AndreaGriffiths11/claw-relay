@@ -134,58 +134,38 @@ async function launchChrome(): Promise<void> {
     process.exit(1);
   }
 
-  // Use the user's real Chrome profile — no temp profiles
-  // If Chrome is already running, we need to restart it with CDP enabled
+  // Use a persistent dedicated profile — not the user's main Chrome profile
+  // (can't share with an already-running Chrome) but logins persist between runs
   const platform = process.platform;
-  const defaultProfile = platform === 'darwin'
-    ? `${process.env.HOME}/Library/Application Support/Google/Chrome`
+  const profileDir = platform === 'darwin'
+    ? `${process.env.HOME}/.claw-relay/chrome-data`
     : platform === 'win32'
-      ? `${process.env.LOCALAPPDATA}\\Google\\Chrome\\User Data`
-      : `${process.env.HOME}/.config/google-chrome`;
+      ? `${process.env.LOCALAPPDATA}\\.claw-relay\\chrome-data`
+      : `${process.env.HOME}/.claw-relay/chrome-data`;
 
-  // Check if Chrome is already running (without CDP)
+  // Check if Chrome is already running
   const chromeRunning = (() => {
     try {
-      const result = execSync(
-        platform === 'darwin' ? 'pgrep -x "Google Chrome"' : 'pgrep -x chrome',
+      execSync(
+        platform === 'darwin' ? 'pgrep -f "claw-relay/chrome-data"' : 'pgrep -f "claw-relay/chrome-data"',
         { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
       );
-      return result.trim().length > 0;
+      return true;
     } catch { return false; }
   })();
 
   if (chromeRunning) {
-    console.log('🌐 Chrome is running — restarting with remote debugging...');
-    // Gracefully quit Chrome
-    if (platform === 'darwin') {
-      try { execSync('osascript -e \'quit app "Google Chrome"\'', { stdio: 'ignore' }); } catch {}
-    } else {
-      try { execSync('pkill -TERM chrome', { stdio: 'ignore' }); } catch {}
-    }
-    // Wait for Chrome to fully quit (check every 500ms, up to 15s)
-    let quit = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      try {
-        execSync(platform === 'darwin' ? 'pgrep -x "Google Chrome"' : 'pgrep -x chrome',
-          { stdio: ['pipe', 'pipe', 'pipe'] });
-      } catch { quit = true; break; }
-    }
-    if (!quit) {
-      console.log('   ⚠ Chrome didn\'t quit gracefully, force killing...');
-      try { execSync(platform === 'darwin' ? 'pkill -9 "Google Chrome"' : 'pkill -9 chrome', { stdio: 'ignore' }); } catch {}
-      await new Promise(r => setTimeout(r, 2000));
-    }
-    // Extra wait for profile lock to release
+    // Kill only the Claw Relay Chrome, not the user's main Chrome
+    console.log('🌐 Restarting Claw Relay Chrome...');
+    try { execSync('pkill -f "claw-relay/chrome-data"', { stdio: 'ignore' }); } catch {}
     await new Promise(r => setTimeout(r, 2000));
   } else {
-    console.log('🌐 Launching Chrome with remote debugging...');
+    console.log('🌐 Launching Chrome...');
   }
 
   const child = spawn(chromePath, [
     '--remote-debugging-port=9222',
-    `--user-data-dir=${defaultProfile}`,
-    '--profile-directory=Default',
+    `--user-data-dir=${profileDir}`,
     '--no-first-run',
     '--no-default-browser-check',
   ], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
