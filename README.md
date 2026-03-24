@@ -96,6 +96,12 @@ bunx claw-relay [options]
 | [Tunnels](docs/tunnels.md) | Remote access |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
 
+## Rust Implementation
+
+An experimental Rust implementation is available at [claw-relay-core](https://github.com/AndreaGriffiths11/claw-relay-core) — single binary, zero runtime dependencies. Useful for embedded devices or constrained environments.
+
+> ⚠️ **Experimental and not actively maintained.** Use the main TypeScript package for production.
+
 ## License
 
 MIT
