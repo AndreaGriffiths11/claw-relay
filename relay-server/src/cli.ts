@@ -185,11 +185,18 @@ async function launchChrome(): Promise<void> {
   child.unref();
   chromePid = child.pid;
 
-  // Bring to front on macOS
+  // Bring to front and resize on macOS
   if (platform === 'darwin') {
     setTimeout(() => {
-      try { execSync('osascript -e \'activate app "Google Chrome"\'', { stdio: 'ignore' }); } catch {}
-    }, 2000);
+      try {
+        execSync(`osascript -e '
+          tell application "Google Chrome"
+            activate
+            set bounds of front window to {0, 0, 1920, 1080}
+          end tell
+        '`, { stdio: 'ignore' });
+      } catch {}
+    }, 3000);
   }
 
   // Wait for CDP
