@@ -134,17 +134,63 @@ async function launchChrome(): Promise<void> {
     process.exit(1);
   }
 
-  console.log('🌐 Launching Chrome...');
+  // Use the user's real Chrome profile — no temp profiles
+  // If Chrome is already running, we need to restart it with CDP enabled
+  const platform = process.platform;
+  const defaultProfile = platform === 'darwin'
+    ? `${process.env.HOME}/Library/Application Support/Google/Chrome`
+    : platform === 'win32'
+      ? `${process.env.LOCALAPPDATA}\\Google\\Chrome\\User Data`
+      : `${process.env.HOME}/.config/google-chrome`;
+
+  // Check if Chrome is already running (without CDP)
+  const chromeRunning = (() => {
+    try {
+      const result = execSync(
+        platform === 'darwin' ? 'pgrep -x "Google Chrome"' : 'pgrep -x chrome',
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      );
+      return result.trim().length > 0;
+    } catch { return false; }
+  })();
+
+  if (chromeRunning) {
+    console.log('🌐 Chrome is running — restarting with remote debugging...');
+    // Gracefully quit Chrome
+    if (platform === 'darwin') {
+      try { execSync('osascript -e \'quit app "Google Chrome"\'', { stdio: 'ignore' }); } catch {}
+    } else {
+      try { execSync('pkill -TERM chrome', { stdio: 'ignore' }); } catch {}
+    }
+    // Wait for Chrome to quit
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        execSync(platform === 'darwin' ? 'pgrep -x "Google Chrome"' : 'pgrep -x chrome',
+          { stdio: ['pipe', 'pipe', 'pipe'] });
+      } catch { break; } // Not running anymore
+    }
+    await new Promise(r => setTimeout(r, 1000));
+  } else {
+    console.log('🌐 Launching Chrome with remote debugging...');
+  }
+
   const child = spawn(chromePath, [
     '--remote-debugging-port=9222',
-    '--user-data-dir=/tmp/claw-relay-chrome',
-    '--window-size=1920,1080',
+    `--user-data-dir=${defaultProfile}`,
     '--no-first-run',
     '--no-default-browser-check',
   ], { detached: true, stdio: 'ignore' });
 
   child.unref();
   chromePid = child.pid;
+
+  // Bring to front on macOS
+  if (platform === 'darwin') {
+    setTimeout(() => {
+      try { execSync('osascript -e \'activate app "Google Chrome"\'', { stdio: 'ignore' }); } catch {}
+    }, 2000);
+  }
 
   // Wait for CDP
   for (let i = 0; i < 30; i++) {
@@ -157,7 +203,7 @@ async function launchChrome(): Promise<void> {
       }
     } catch {}
   }
-  console.error('✗ Chrome failed to start with CDP. Is another instance running?');
+  console.error('✗ Chrome failed to start with CDP.');
   process.exit(1);
 }
 
