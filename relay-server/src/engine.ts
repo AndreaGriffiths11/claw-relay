@@ -17,7 +17,7 @@ export class Engine {
 
   private async getBrowser(): Promise<Browser> {
     if (this.browser?.connected) return this.browser;
-    this.browser = await puppeteer.connect({ browserURL: this.cdpUrl });
+    this.browser = await puppeteer.connect({ browserURL: this.cdpUrl, defaultViewport: null });
     return this.browser;
   }
 
