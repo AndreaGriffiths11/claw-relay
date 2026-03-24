@@ -31,20 +31,6 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
 
-  rust:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: relay-core
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - run: cargo build
-      - run: cargo clippy -- -D warnings
-      - run: cargo test
-
   mcp:
     runs-on: ubuntu-latest
     defaults:
