@@ -162,15 +162,22 @@ async function launchChrome(): Promise<void> {
     } else {
       try { execSync('pkill -TERM chrome', { stdio: 'ignore' }); } catch {}
     }
-    // Wait for Chrome to quit
-    for (let i = 0; i < 10; i++) {
+    // Wait for Chrome to fully quit (check every 500ms, up to 15s)
+    let quit = false;
+    for (let i = 0; i < 30; i++) {
       await new Promise(r => setTimeout(r, 500));
       try {
         execSync(platform === 'darwin' ? 'pgrep -x "Google Chrome"' : 'pgrep -x chrome',
           { stdio: ['pipe', 'pipe', 'pipe'] });
-      } catch { break; } // Not running anymore
+      } catch { quit = true; break; }
     }
-    await new Promise(r => setTimeout(r, 1000));
+    if (!quit) {
+      console.log('   ⚠ Chrome didn\'t quit gracefully, force killing...');
+      try { execSync(platform === 'darwin' ? 'pkill -9 "Google Chrome"' : 'pkill -9 chrome', { stdio: 'ignore' }); } catch {}
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    // Extra wait for profile lock to release
+    await new Promise(r => setTimeout(r, 2000));
   } else {
     console.log('🌐 Launching Chrome with remote debugging...');
   }
@@ -181,7 +188,17 @@ async function launchChrome(): Promise<void> {
     '--profile-directory=Default',
     '--no-first-run',
     '--no-default-browser-check',
-  ], { detached: true, stdio: 'ignore' });
+  ], { detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
+
+  // Log Chrome stderr for debugging
+  if (child.stderr) {
+    child.stderr.on('data', (data: Buffer) => {
+      const msg = data.toString().trim();
+      if (msg && !msg.includes('DevTools listening')) {
+        console.log(`   Chrome: ${msg.slice(0, 200)}`);
+      }
+    });
+  }
 
   child.unref();
   chromePid = child.pid;
