@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-bunx claw-relay
+npx claw-relay
 ```
 
 On first run, this will:
@@ -22,13 +22,13 @@ The Chrome window uses a dedicated profile at `~/.claw-relay/chrome-data/`. Your
 # Ctrl+C stops the relay server
 # Chrome stays open — tabs, logins preserved
 
-bunx claw-relay
+npx claw-relay
 # Detects running Chrome, reconnects without relaunching
 ```
 
 ## Remote Access (Tunnels)
 
-For agents running on a different machine, use `start.sh` with a tunnel (available when you've cloned the repo — the primary install method is `bunx claw-relay`):
+For agents running on a different machine, use `start.sh` with a tunnel (available when you've cloned the repo — the primary install method is `npx claw-relay`):
 
 ```bash
 ./start.sh                        # Cloudflare quick tunnel (default)
@@ -68,7 +68,7 @@ dashboard:
 ## CLI Options
 
 ```
-bunx claw-relay [options]
+npx claw-relay [options]
 
   --port <number>    Server port (default: 9333)
   --config <path>    Custom config path

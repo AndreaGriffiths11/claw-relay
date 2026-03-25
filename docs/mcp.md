@@ -5,7 +5,7 @@ The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-comp
 ## Setup
 
 ```bash
-cd mcp && bun install   # or npm install
+cd mcp && npm install   # install dependencies
 ```
 
 ## Tools

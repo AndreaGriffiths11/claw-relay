@@ -21,18 +21,18 @@
     "SKILL.md"
   ],
   "engines": {
-    "bun": ">=1.0.0"
+    "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "cd relay-server && bun run build",
-    "start": "cd relay-server && bun start",
-    "dev": "cd relay-server && bun run dev"
+    "start": "cd relay-server && npx tsx src/index.ts",
+    "dev": "cd relay-server && npx tsx --watch src/index.ts",
+    "build": "cd relay-server && npm run build"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/AndreaGriffiths11/claw-relay.git"
   },
-  "keywords": ["ai", "agent", "browser", "relay", "chrome", "copilot", "automation", "mcp", "cdp", "puppeteer", "browser-automation"],
+  "keywords": ["ai", "agent", "browser", "relay", "chrome", "copilot", "automation", "mcp", "cdp", "playwright", "browser-automation"],
   "author": "Andrea Griffiths",
   "license": "MIT"
 }
