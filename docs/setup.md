@@ -28,7 +28,7 @@ bunx claw-relay
 
 ## Remote Access (Tunnels)
 
-For agents running on a different machine, use `start.sh` with a tunnel:
+For agents running on a different machine, use `start.sh` with a tunnel (available when you've cloned the repo — the primary install method is `bunx claw-relay`):
 
 ```bash
 ./start.sh                        # Cloudflare quick tunnel (default)

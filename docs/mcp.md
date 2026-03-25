@@ -1,6 +1,6 @@
 # MCP Server
 
-The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (GitHub Copilot CLI, Claude Desktop, etc.) to Claw Relay™.
+The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (GitHub Copilot CLI, Claude Desktop, etc.) to Claw Relay.
 
 ## Setup
 
@@ -69,3 +69,4 @@ Or in a config file (`~/.copilot/mcp-config.json`):
 ## Concurrent Requests
 
 The MCP server includes a `request_id` field with every action sent to the relay. Responses carry the same `request_id` back, allowing the server to match results to the correct pending request even when multiple actions are in flight simultaneously.
+ match results to the correct pending request even when multiple actions are in flight simultaneously.
