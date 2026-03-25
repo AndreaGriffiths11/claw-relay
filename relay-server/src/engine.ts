@@ -21,7 +21,7 @@ export class Engine {
     return this.browser;
   }
 
-  private async getActivePage(): Promise<Page> {
+  private async getActivePage(createIfMissing = false): Promise<Page> {
     const browser = await this.getBrowser();
     const pages = await browser.pages();
     // Filter out extension pages, chrome:// pages, and devtools
@@ -29,7 +29,12 @@ export class Engine {
       const url = p.url();
       return url.startsWith('http://') || url.startsWith('https://') || url === 'about:blank';
     });
-    if (browsable.length === 0) throw new Error('No browser tabs open');
+    if (browsable.length === 0) {
+      if (createIfMissing) {
+        return await browser.newPage();
+      }
+      throw new Error('No browser tabs open');
+    }
     return browsable[browsable.length - 1];
   }
 
@@ -44,7 +49,10 @@ export class Engine {
   }
 
   private async runAction(msg: ActionMessage): Promise<string | undefined> {
-    const page = await this.getActivePage();
+    // Navigate can create a tab if none exist
+    const page = msg.type === 'navigate'
+      ? await this.getActivePage(true)
+      : await this.getActivePage();
 
     switch (msg.type) {
       case 'snapshot':
