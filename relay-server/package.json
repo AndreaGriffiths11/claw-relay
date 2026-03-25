@@ -1,6 +1,7 @@
 {
   "name": "claw-relay-server",
   "version": "0.1.0",
+  "type": "module",
   "description": "Trust layer between AI agents and Chrome",
   "main": "src/index.ts",
   "scripts": {
@@ -10,15 +11,16 @@
     "build": "npm run build:dashboard"
   },
   "dependencies": {
+    "@hono/node-server": "^1.13.0",
     "hono": "^4.12.8",
     "playwright-core": "^1.58.0",
-    "@hono/node-server": "^1.13.0",
-    "ws": "^8.18.0",
     "typescript": "^5.9.3",
+    "ws": "^8.18.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
-    "@types/node": "^22.0.0"
+    "tsup": "^8.5.1"
   }
 }
