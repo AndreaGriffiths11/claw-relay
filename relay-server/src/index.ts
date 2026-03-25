@@ -163,6 +163,7 @@ function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: str
   state.authenticated = true;
   state.agentId = agentId;
   state.agentConfig = agentConfig;
+  engine.setRestrictions(agentId, agentConfig.allowlist, config.blocklist || []);
   connectedAgentIds.set(agentId, ws);
   lastPong.set(agentId, Date.now());
   agentConnected(agentId);

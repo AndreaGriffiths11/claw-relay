@@ -2,6 +2,7 @@
 
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { ActionMessage } from './protocol';
+import { isAllowed } from './allowlist';
 
 export class Engine {
   private browser: Browser | null = null;
@@ -9,16 +10,69 @@ export class Engine {
   private readonly cdpUrl: string;
   private consoleMessages: Array<{ level: string; text: string; timestamp: number }> = [];
   private networkRequests: Array<{ url: string; method: string; status?: number; timestamp: number }> = [];
+  private blocklist: string[] = [];
+  private allowlists: Map<string, string[]> = new Map();
+  private currentAgentId: string | null = null;
 
   constructor(timeout: number, cdpUrl = 'http://127.0.0.1:9222') {
     this.timeout = timeout;
     this.cdpUrl = cdpUrl;
   }
 
+  setRestrictions(agentId: string, allowlist: string[], blocklist: string[]): void {
+    this.blocklist = blocklist;
+    this.allowlists.set(agentId, allowlist);
+    this.currentAgentId = agentId;
+  }
+
   private async getBrowser(): Promise<Browser> {
     if (this.browser?.connected) return this.browser;
     this.browser = await puppeteer.connect({ browserURL: this.cdpUrl, defaultViewport: null });
     return this.browser;
+  }
+
+  private listenedPages = new WeakSet<Page>();
+
+  private setupPageListeners(page: Page): void {
+    if (this.listenedPages.has(page)) return;
+    this.listenedPages.add(page);
+
+    // SSRF: block redirects to disallowed URLs
+    page.on('framenavigated', async (frame) => {
+      if (frame !== page.mainFrame()) return;
+      const url = frame.url();
+      if (!url || url === 'about:blank') return;
+      const agentAllowlist = this.currentAgentId
+        ? this.allowlists.get(this.currentAgentId) || ['*']
+        : ['*'];
+      const check = isAllowed(url, agentAllowlist, this.blocklist);
+      if (!check.allowed) {
+        console.warn(`Blocked redirect to ${url} — navigating to about:blank`);
+        await page.goto('about:blank').catch(() => {});
+      }
+    });
+
+    // Console message buffer
+    page.on('console', msg => {
+      this.consoleMessages.push({
+        level: msg.type(),
+        text: msg.text(),
+        timestamp: Date.now(),
+      });
+      if (this.consoleMessages.length > 1000) this.consoleMessages.splice(0, 500);
+    });
+
+    // Network request buffer
+    page.on('requestfinished', req => {
+      const resp = req.response();
+      this.networkRequests.push({
+        url: req.url(),
+        method: req.method(),
+        status: resp?.status(),
+        timestamp: Date.now(),
+      });
+      if (this.networkRequests.length > 1000) this.networkRequests.splice(0, 500);
+    });
   }
 
   private async getActivePage(createIfMissing = false): Promise<Page> {
@@ -30,11 +84,15 @@ export class Engine {
     });
     if (browsable.length === 0) {
       if (createIfMissing) {
-        return await browser.newPage();
+        const newPage = await browser.newPage();
+        this.setupPageListeners(newPage);
+        return newPage;
       }
       throw new Error('No browser tabs open');
     }
-    return browsable[browsable.length - 1];
+    const activePage = browsable[browsable.length - 1];
+    this.setupPageListeners(activePage);
+    return activePage;
   }
 
   private async getPageByTargetId(targetId: string): Promise<Page> {
@@ -46,29 +104,6 @@ export class Engine {
     });
     if (!page) throw new Error(`Tab not found: ${targetId}`);
     return page;
-  }
-
-  private setupPageListeners(page: Page): void {
-    if ((page as any)._relayListenersAttached) return;
-    (page as any)._relayListenersAttached = true;
-    page.on('console', msg => {
-      this.consoleMessages.push({
-        level: msg.type(),
-        text: msg.text(),
-        timestamp: Date.now(),
-      });
-      if (this.consoleMessages.length > 1000) this.consoleMessages.splice(0, 500);
-    });
-    page.on('requestfinished', req => {
-      const resp = req.response();
-      this.networkRequests.push({
-        url: req.url(),
-        method: req.method(),
-        status: resp?.status(),
-        timestamp: Date.now(),
-      });
-      if (this.networkRequests.length > 1000) this.networkRequests.splice(0, 500);
-    });
   }
 
   private async findElement(page: Page, ref?: string, selector?: string) {
