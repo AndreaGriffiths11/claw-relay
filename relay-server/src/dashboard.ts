@@ -4,8 +4,12 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import * as fs from 'fs';
 import * as path from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import * as crypto from 'crypto';
 import * as YAML from 'yaml';
 import type { Context } from 'hono';
@@ -14,12 +18,12 @@ import { type Config, type AgentConfig, loadConfig } from './auth';
 import type { AgentState } from './state';
 import { tailLines } from './audit-logger';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 type GetStateFn = () => { connections: AgentState[]; startedAt: string };
 
 // --- Auth helpers ---
 
-// Same SHA-256 + timingSafeEqual pattern as WebSocket auth.
-// Hashing both sides prevents token length leaking via timing.
 function checkAuth(config: Config, req: Request): boolean {
   const authHeader = req.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return false;
@@ -37,8 +41,6 @@ function redactToken(token: string): string {
 
 // --- Config persistence ---
 
-// Atomic write: write to .tmp file then rename, so a crash mid-write
-// doesn't corrupt the config
 function writeConfigAtomic(configPath: string, config: Config): void {
   const data = {
     server: config.server,
@@ -127,7 +129,6 @@ export function startDashboard(
 
   const app = new Hono();
 
-  // #9: CORS uses configured port, not hardcoded
   const dashPort = config.dashboard.port;
   app.use('*', cors({
     origin: [`http://localhost:${dashPort}`, `http://127.0.0.1:${dashPort}`],
@@ -135,12 +136,12 @@ export function startDashboard(
     allowHeaders: ['Authorization', 'Content-Type'],
   }));
 
-  // Health check — no auth required, used by monitoring
+  // Health check
   app.get('/health', (c) => {
     return c.json({ status: 'ok', version: '0.1.0', uptime: process.uptime() });
   });
 
-  // Auth middleware for all API routes
+  // Auth middleware
   const requireAuth = async (c: Context, next: Next) => {
     if (!config.dashboard.adminToken) {
       return c.json({ error: 'Dashboard disabled: no adminToken configured' }, 403);
@@ -252,29 +253,22 @@ export function startDashboard(
   const distExists = fs.existsSync(path.join(distDir, 'index.html'));
 
   if (distExists) {
-    // Serve static assets (JS, CSS, etc.)
-    app.get('/assets/*', async (c) => {
-      const filePath = path.join(distDir, c.req.path);
-      try {
-        const file = Bun.file(filePath);
-        if (await file.exists()) return new Response(file);
-      } catch {}
-      return c.notFound();
-    });
+    // Serve static assets
+    app.use('/assets/*', serveStatic({ root: distDir.replace(/\/+$/, '') + '/' }));
 
-    // SPA fallback — serve index.html for all non-API routes
+    // SPA fallback
     app.get('*', (c) => {
-      return new Response(Bun.file(path.join(distDir, 'index.html')));
+      const html = fs.readFileSync(path.join(distDir, 'index.html'), 'utf-8');
+      return c.html(html);
     });
   } else {
-    // No built dashboard — show simple status page
     app.get('*', (c) => {
       return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0a0a0f;color:#e2e8f0">
-        <div style="text-align:center"><h1>🦞 Claw Relay™ Dashboard</h1><p style="color:#94a3b8">Run <code style="color:#06b6d4">cd dashboard && bun run build</code> to enable the full dashboard UI.</p></div>
+        <div style="text-align:center"><h1>🦞 Claw Relay™ Dashboard</h1><p style="color:#94a3b8">Run <code style="color:#06b6d4">cd dashboard && npm run build</code> to enable the full dashboard UI.</p></div>
       </body></html>`);
     });
   }
 
-  Bun.serve({ port: config.dashboard.port, fetch: app.fetch });
+  serve({ fetch: app.fetch, port: config.dashboard.port });
   console.log(`Dashboard on http://localhost:${config.dashboard.port}`);
 }

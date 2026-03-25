@@ -35,13 +35,13 @@ echo ""
 
 # Check dependencies
 MISSING=""
-if ! command -v bun >/dev/null 2>&1; then MISSING="$MISSING bun"; fi
+if ! command -v node >/dev/null 2>&1; then MISSING="$MISSING node"; fi
 if [ "$TUNNEL" = "cloudflare" ] && ! command -v cloudflared >/dev/null 2>&1; then MISSING="$MISSING cloudflared"; fi
 
 if [ -n "$MISSING" ]; then
   echo "✗ Missing:$MISSING"
   echo ""
-  command -v bun >/dev/null 2>&1 || echo "  Install Bun:         curl -fsSL https://bun.sh/install | bash"
+  command -v node >/dev/null 2>&1 || echo "  Install Node: https://nodejs.org
   command -v cloudflared >/dev/null 2>&1 || echo "  Install cloudflared: brew install cloudflared"
   echo ""
   exit 1
@@ -50,18 +50,18 @@ fi
 # Install deps if needed
 if [ ! -d "relay-server/node_modules" ]; then
   echo "⚙  Installing dependencies..."
-  cd relay-server && bun install && cd ..
+  cd relay-server && npm install && cd ..
 fi
 
 # Build dashboard if needed
 if [ ! -d "relay-server/dashboard/dist" ]; then
   echo "🎨 Building dashboard..."
-  cd relay-server/dashboard && bun install && bun run build && cd ../..
+  cd relay-server/dashboard && npm install && npm run build && cd ../..
 fi
 
 # Start relay (handles Chrome + server + auto-config)
 cd relay-server
-CLAW_RELAY_NO_BANNER=1 bun src/cli.ts $EXTRA_ARGS &
+CLAW_RELAY_NO_BANNER=1 npx tsx src/cli.ts $EXTRA_ARGS &
 RELAY_PID=$!
 cd ..
 

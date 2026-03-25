@@ -3,6 +3,10 @@
 // restrictions on every action.
 
 import * as path from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import { loadConfig, authenticate, type Config, type AgentConfig } from './auth';
 import { parseMessage, isAuthMessage, isActionMessage, type ActionMessage, type OutgoingMessage } from './protocol';
 import { hasPermission } from './permissions';
@@ -13,11 +17,11 @@ import { Engine } from './engine';
 import { agentConnected, agentDisconnected, agentAction, getState } from './state';
 import { startDashboard } from './dashboard';
 
-import type { ServerWebSocket } from 'bun';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // --- Config ---
 
-const configPath = process.argv[2] || path.join(import.meta.dir, '..', 'config.example.yaml');
+const configPath = process.argv[2] || path.join(__dirname, '..', 'config.example.yaml');
 let config = loadConfig(configPath);
 
 export function reloadCurrentConfig(): void {
@@ -44,30 +48,17 @@ interface ClientState {
 }
 
 const clients = new WeakMap<object, ClientState>();
-const connectedAgentIds = new Map<string, ServerWebSocket<unknown>>();
+const connectedAgentIds = new Map<string, WebSocket>();
 const lastPong = new Map<string, number>();
 
 // Max failed auth attempts per connection before forced disconnect
 const MAX_AUTH_ATTEMPTS = 5;
 
 // --- Heartbeat ---
-// Ping connected agents every 30s. If an agent hasn't ponged in 90s,
-// assume the connection is dead and drop it. Without this, zombie
-// connections accumulate and block reconnection (duplicate agent ID check).
-
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const STALE_THRESHOLD_MS = 90_000;
-
-// Max WebSocket message size — 1MB prevents memory exhaustion from
-// oversized payloads while allowing large snapshots through
 const MAX_MESSAGE_SIZE = 1024 * 1024;
-
-// Unauthenticated connections must complete auth within this window.
-// Prevents resource exhaustion from connections that open but never authenticate.
 const AUTH_TIMEOUT_MS = 30_000;
-
-// Max total concurrent WebSocket connections (authenticated + unauthenticated).
-// Prevents resource exhaustion from connection floods.
 const MAX_CONNECTIONS = 100;
 let activeConnections = 0;
 
@@ -84,19 +75,18 @@ const heartbeatInterval = setInterval(() => {
   }
 }, HEARTBEAT_INTERVAL_MS);
 
-// --- Dangerous URL schemes that should never be navigated to ---
+// --- Dangerous URL schemes ---
 const BLOCKED_SCHEMES = ['javascript:', 'data:', 'file:', 'vbscript:'];
 
 // --- Message handling ---
 
-function send(ws: ServerWebSocket<unknown>, msg: OutgoingMessage): void {
+function send(ws: WebSocket, msg: OutgoingMessage): void {
   ws.send(JSON.stringify(msg));
 }
 
-async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise<void> {
+async function handleMessage(ws: WebSocket, raw: string): Promise<void> {
   const state = clients.get(ws)!;
 
-  // #8: Message size limit
   if (raw.length > MAX_MESSAGE_SIZE) {
     send(ws, { type: 'error', code: 'message_too_large', message: 'Message exceeds 1MB limit' });
     return;
@@ -114,7 +104,6 @@ async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise
     return;
   }
 
-  // --- Authentication gate ---
   if (!state.authenticated) {
     if (!isAuthMessage(msg)) {
       send(ws, { type: 'error', code: 'not_authenticated', message: 'Send auth message first' });
@@ -124,7 +113,6 @@ async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise
     return;
   }
 
-  // --- Action pipeline ---
   if (!isActionMessage(msg)) {
     send(ws, { type: 'error', code: 'invalid_action', message: 'Unknown action type' });
     return;
@@ -133,8 +121,7 @@ async function handleMessage(ws: ServerWebSocket<unknown>, raw: string): Promise
   await handleAction(ws, state, msg);
 }
 
-function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: string, agentId: string): void {
-  // Rate limit auth attempts — 5 failures per connection
+function handleAuth(ws: WebSocket, state: ClientState, token: string, agentId: string): void {
   if (state.authAttempts >= MAX_AUTH_ATTEMPTS) {
     audit.log({ agent_id: agentId || 'unknown', action: 'auth', ok: false, duration_ms: 0, error: 'auth_rate_limited' });
     send(ws, { type: 'error', code: 'rate_limited', message: 'Too many auth attempts' });
@@ -145,14 +132,12 @@ function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: str
   const agentConfig = authenticate(config, token, agentId);
   if (!agentConfig) {
     state.authAttempts++;
-    // #5: Log failed auth attempts for attack detection
     audit.log({ agent_id: agentId || 'unknown', action: 'auth', ok: false, duration_ms: 0, error: 'auth_failed' });
     send(ws, { type: 'error', code: 'auth_failed', message: 'Invalid token or agent_id' });
     ws.close();
     return;
   }
 
-  // One connection per agent ID — prevents conflicting actions
   if (connectedAgentIds.has(agentId)) {
     console.warn(`Duplicate agent ID rejected: ${agentId}`);
     send(ws, { type: 'error', code: 'duplicate_agent', message: 'Agent ID already connected' });
@@ -171,27 +156,23 @@ function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: str
   send(ws, { type: 'result', action: 'auth', ok: true });
 }
 
-async function handleAction(ws: ServerWebSocket<unknown>, state: ClientState, msg: ActionMessage): Promise<void> {
+async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessage): Promise<void> {
   const agentId = state.agentId!;
   const agentCfg = state.agentConfig!;
   const reqId = msg.request_id;
 
-  // Permission check
   if (!hasPermission(agentCfg.scopes, msg.type)) {
     send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks scope for '${msg.type}'`, request_id: reqId });
     audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
     return;
   }
 
-  // Rate limit check
   if (!rateLimiter.check(agentId, agentCfg.rateLimit)) {
     send(ws, { type: 'error', code: 'rate_limited', message: 'Rate limit exceeded', request_id: reqId });
     audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'rate_limited' });
     return;
   }
 
-  // URL restriction — navigate checks the target URL,
-  // all other actions check the current URL (except close)
   const blockError = await checkUrlRestrictions(msg, agentCfg);
   if (blockError) {
     send(ws, { type: 'error', code: 'site_blocked', message: blockError.reason, request_id: reqId });
@@ -199,7 +180,6 @@ async function handleAction(ws: ServerWebSocket<unknown>, state: ClientState, ms
     return;
   }
 
-  // Execute and respond
   const startTime = Date.now();
   const result = await engine.execute(msg);
   const duration = Date.now() - startTime;
@@ -213,7 +193,6 @@ async function handleAction(ws: ServerWebSocket<unknown>, state: ClientState, ms
     return;
   }
 
-  // Screenshots come as base64 directly from the engine
   if (msg.type === 'screenshot' && result.data) {
     send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, mimeType: msg.imageType === 'jpeg' ? 'image/jpeg' : 'image/png', request_id: reqId, targetId: result.targetId });
   } else {
@@ -235,7 +214,6 @@ async function checkUrlRestrictions(
 
   if (!urlToCheck) return null;
 
-  // #17: Block dangerous URL schemes before allowlist/blocklist check
   const lowerUrl = urlToCheck.toLowerCase().trim();
   for (const scheme of BLOCKED_SCHEMES) {
     if (lowerUrl.startsWith(scheme)) {
@@ -248,71 +226,83 @@ async function checkUrlRestrictions(
   return { reason: check.reason || 'Site blocked', url: urlToCheck };
 }
 
-
-
 // --- WebSocket server ---
 
-const wsServer = Bun.serve({
-  port: config.server.port,
-  hostname: config.server.host,
-  fetch(req, server) {
-    const origin = req.headers.get('Origin');
-    if (origin) {
+const server = createServer((req, res) => {
+  if (!req.headers.upgrade) {
+    res.writeHead(200);
+    res.end('Claw Relay™ WebSocket server');
+    return;
+  }
+});
+
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  if (activeConnections >= MAX_CONNECTIONS) {
+    socket.destroy();
+    return;
+  }
+
+  const origin = req.headers.origin;
+  if (origin) {
+    try {
       const url = new URL(origin);
       const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
       if (!isLocal) {
-        return new Response('Forbidden', { status: 403 });
-      }
-    }
-    if (server.upgrade(req)) return;
-    return new Response('Claw Relay™ WebSocket server', { status: 200 });
-  },
-  websocket: {
-    // #8: Cap incoming WebSocket frame size
-    maxPayloadLength: MAX_MESSAGE_SIZE,
-    open(ws) {
-      // Connection limit — reject if at capacity
-      if (activeConnections >= MAX_CONNECTIONS) {
-        ws.close(1013, 'Server at capacity');
+        socket.destroy();
         return;
       }
-      activeConnections++;
-      clients.set(ws, { authenticated: false, authAttempts: 0 });
+    } catch {
+      socket.destroy();
+      return;
+    }
+  }
 
-      // Auth timeout — close if not authenticated within 30s
-      setTimeout(() => {
-        const state = clients.get(ws);
-        if (state && !state.authenticated) {
-          send(ws, { type: 'error', code: 'auth_timeout', message: 'Authentication timeout' });
-          ws.close(4008, 'Auth timeout');
-        }
-      }, AUTH_TIMEOUT_MS);
-    },
-    message(ws, message) {
-      const decoded = typeof message === 'string' ? message : new TextDecoder().decode(message);
-      handleMessage(ws, decoded);
-    },
-    close(ws) {
-      activeConnections--;
-      const state = clients.get(ws);
-      if (state?.agentId) {
-        connectedAgentIds.delete(state.agentId);
-        lastPong.delete(state.agentId);
-        agentDisconnected(state.agentId);
-        console.log(`Agent ${state.agentId} disconnected`);
-      }
-    },
-  },
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req);
+  });
 });
 
-console.log(`Claw Relay™ listening on ${config.server.host}:${config.server.port}`);
+wss.on('connection', (ws: WebSocket) => {
+  activeConnections++;
+  const state: ClientState = { authenticated: false, authAttempts: 0 };
+  clients.set(ws, state);
+
+  setTimeout(() => {
+    if (!state.authenticated) {
+      send(ws, { type: 'error', code: 'auth_timeout', message: 'Authentication timeout' });
+      ws.close(4008, 'Auth timeout');
+    }
+  }, AUTH_TIMEOUT_MS);
+
+  ws.on('message', (data: Buffer | string) => {
+    const decoded = typeof data === 'string' ? data : data.toString();
+    handleMessage(ws, decoded);
+  });
+
+  ws.on('close', () => {
+    activeConnections--;
+    if (state.agentId) {
+      connectedAgentIds.delete(state.agentId);
+      lastPong.delete(state.agentId);
+      agentDisconnected(state.agentId);
+      console.log(`Agent ${state.agentId} disconnected`);
+    }
+  });
+});
+
+server.listen(config.server.port, config.server.host, () => {
+  console.log(`Claw Relay™ listening on ${config.server.host}:${config.server.port}`);
+});
 
 // --- Graceful shutdown ---
 
 function shutdown(): void {
   console.log('Shutting down...');
   clearInterval(heartbeatInterval);
-  wsServer.stop();
+  wss.close();
+  server.close();
   rateLimiter.destroy();
   process.exit(0);
 }

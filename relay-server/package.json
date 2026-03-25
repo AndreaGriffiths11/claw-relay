@@ -4,20 +4,21 @@
   "description": "Trust layer between AI agents and Chrome",
   "main": "src/index.ts",
   "scripts": {
-    "start": "bun src/index.ts",
-    "dev": "bun --watch src/index.ts",
-    "build:dashboard": "cd dashboard && bun install && bun run build",
-    "build": "bun run build:dashboard"
+    "start": "npx tsx src/index.ts",
+    "dev": "npx tsx --watch src/index.ts",
+    "build:dashboard": "cd dashboard && npm install && npm run build",
+    "build": "npm run build:dashboard"
   },
   "dependencies": {
     "hono": "^4.12.8",
-    "puppeteer-core": "^24.0.0",
+    "playwright-core": "^1.58.0",
+    "@hono/node-server": "^1.13.0",
+    "ws": "^8.18.0",
     "typescript": "^5.9.3",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
-    "@types/bun": "latest",
     "@types/ws": "^8.18.1",
-    "bun-types": "^1.3.11"
+    "@types/node": "^22.0.0"
   }
 }

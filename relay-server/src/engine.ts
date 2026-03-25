@@ -1,8 +1,19 @@
-// Browser engine using puppeteer-core over Chrome DevTools Protocol.
+// Browser engine using playwright-core over Chrome DevTools Protocol.
 
-import puppeteer, { type Browser, type Page } from 'puppeteer-core';
+import { chromium, type Browser, type Page, type ElementHandle } from 'playwright-core';
 import { ActionMessage } from './protocol';
 import { isAllowed } from './allowlist';
+
+// Flatten Playwright's nested accessibility tree into a flat list for wire format
+interface AXNode {
+  role: string;
+  name?: string;
+  value?: string;
+  focused?: boolean;
+  disabled?: boolean;
+  checked?: boolean | 'mixed';
+  children?: AXNode[];
+}
 
 export class Engine {
   private browser: Browser | null = null;
@@ -13,6 +24,10 @@ export class Engine {
   private blocklist: string[] = [];
   private allowlists: Map<string, string[]> = new Map();
   private currentAgentId: string | null = null;
+
+  // Stable page IDs since Playwright doesn't expose Chrome target IDs
+  private pageIds = new Map<Page, string>();
+  private nextPageId = 1;
 
   constructor(timeout: number, cdpUrl = 'http://127.0.0.1:9222') {
     this.timeout = timeout;
@@ -26,9 +41,16 @@ export class Engine {
   }
 
   private async getBrowser(): Promise<Browser> {
-    if (this.browser?.connected) return this.browser;
-    this.browser = await puppeteer.connect({ browserURL: this.cdpUrl, defaultViewport: null });
+    if (this.browser?.isConnected()) return this.browser;
+    this.browser = await chromium.connectOverCDP(this.cdpUrl);
     return this.browser;
+  }
+
+  private getPageId(page: Page): string {
+    if (!this.pageIds.has(page)) {
+      this.pageIds.set(page, `tab-${this.nextPageId++}`);
+    }
+    return this.pageIds.get(page)!;
   }
 
   private listenedPages = new WeakSet<Page>();
@@ -36,6 +58,8 @@ export class Engine {
   private setupPageListeners(page: Page): void {
     if (this.listenedPages.has(page)) return;
     this.listenedPages.add(page);
+    // Ensure stable ID is assigned
+    this.getPageId(page);
 
     // SSRF: block redirects to disallowed URLs
     page.on('framenavigated', async (frame) => {
@@ -62,29 +86,35 @@ export class Engine {
       if (this.consoleMessages.length > 1000) this.consoleMessages.splice(0, 500);
     });
 
-    // Network request buffer
-    page.on('requestfinished', req => {
-      const resp = req.response();
+    // Network request buffer — use response event for status codes
+    page.on('response', resp => {
       this.networkRequests.push({
-        url: req.url(),
-        method: req.method(),
-        status: resp?.status(),
+        url: resp.url(),
+        method: resp.request().method(),
+        status: resp.status(),
         timestamp: Date.now(),
       });
       if (this.networkRequests.length > 1000) this.networkRequests.splice(0, 500);
     });
   }
 
+  private getPages(browser: Browser): Page[] {
+    const ctx = browser.contexts()[0];
+    return ctx ? ctx.pages() : [];
+  }
+
   private async getActivePage(createIfMissing = false): Promise<Page> {
     const browser = await this.getBrowser();
-    const pages = await browser.pages();
+    const pages = this.getPages(browser);
     const browsable = pages.filter(p => {
       const url = p.url();
       return url.startsWith('http://') || url.startsWith('https://') || url === 'about:blank';
     });
     if (browsable.length === 0) {
       if (createIfMissing) {
-        const newPage = await browser.newPage();
+        const ctx = browser.contexts()[0];
+        if (!ctx) throw new Error('No browser context');
+        const newPage = await ctx.newPage();
         this.setupPageListeners(newPage);
         return newPage;
       }
@@ -97,16 +127,14 @@ export class Engine {
 
   private async getPageByTargetId(targetId: string): Promise<Page> {
     const browser = await this.getBrowser();
-    const pages = await browser.pages();
-    const page = pages.find(p => {
-      const target = p.target();
-      return target.url() !== '' && (target as any)._targetId === targetId;
-    });
-    if (!page) throw new Error(`Tab not found: ${targetId}`);
-    return page;
+    const pages = this.getPages(browser);
+    for (const page of pages) {
+      if (this.getPageId(page) === targetId) return page;
+    }
+    throw new Error(`Tab not found: ${targetId}`);
   }
 
-  private async findElement(page: Page, ref?: string, selector?: string) {
+  private async findElement(page: Page, ref?: string, selector?: string): Promise<ElementHandle> {
     if (selector) {
       const el = await page.$(selector);
       if (!el) throw new Error(`Element not found: ${selector}`);
@@ -127,7 +155,7 @@ export class Engine {
           : await this.getActivePage();
       this.setupPageListeners(page);
       const result = await this.runAction(msg, page);
-      const targetId = (page.target() as any)?._targetId;
+      const targetId = this.getPageId(page);
       return { ok: true, data: result, targetId };
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -146,16 +174,11 @@ export class Engine {
           const buf = await el.screenshot({ type: (msg.imageType as 'png' | 'jpeg') || 'png' });
           return Buffer.from(buf).toString('base64');
         }
-        const cdp = await page.createCDPSession();
-        try {
-          const { data } = await cdp.send('Page.captureScreenshot', {
-            format: (msg.imageType as 'png' | 'jpeg' | 'webp') || 'png',
-            captureBeyondViewport: msg.fullPage || false,
-          });
-          return data;
-        } finally {
-          await cdp.detach();
-        }
+        const buf = await page.screenshot({
+          type: (msg.imageType as 'png' | 'jpeg') || 'png',
+          fullPage: msg.fullPage || false,
+        });
+        return Buffer.from(buf).toString('base64');
       }
 
       case 'navigate':
@@ -201,7 +224,7 @@ export class Engine {
       }
 
       case 'press':
-        await page.keyboard.press(msg.key! as any);
+        await page.keyboard.press(msg.key!);
         return `Pressed ${msg.key}`;
 
       case 'evaluate': {
@@ -213,13 +236,13 @@ export class Engine {
 
       case 'select': {
         const el = await this.findElement(page, msg.ref, msg.selector);
-        await el.select(...(msg.values || []));
+        await el.selectOption(msg.values || []);
         return `Selected ${msg.values?.join(', ')} in ${msg.ref || msg.selector}`;
       }
 
       case 'close': {
         const browser = await this.getBrowser();
-        const allPages = await browser.pages();
+        const allPages = this.getPages(browser);
         const activePage = allPages[allPages.length - 1];
         if (allPages.length > 1) {
           await activePage.close();
@@ -244,7 +267,7 @@ export class Engine {
 
       case 'scrollIntoView': {
         const el = await this.findElement(page, msg.ref, msg.selector);
-        await el.evaluate('(node) => node.scrollIntoView({ block: "center", behavior: "smooth" })');
+        await el.evaluate((node: any) => node.scrollIntoView({ block: 'center', behavior: 'smooth' }));
         return `Scrolled ${msg.ref || msg.selector} into view`;
       }
 
@@ -268,7 +291,7 @@ export class Engine {
           return `Text "${msg.textGone}" gone`;
         }
         if (msg.selector) {
-          await page.waitForSelector(msg.selector, { timeout: msg.timeoutMs || this.timeout });
+          await page.locator(msg.selector).waitFor({ timeout: msg.timeoutMs || this.timeout });
           return `Selector "${msg.selector}" appeared`;
         }
         if (msg.url) {
@@ -279,9 +302,8 @@ export class Engine {
           return `URL contains "${msg.url}"`;
         }
         if (msg.loadState) {
-          const waitUntil = msg.loadState as 'load' | 'domcontentloaded' | 'networkidle0';
-          const state = msg.loadState === 'networkidle' ? 'networkidle0' : waitUntil;
-          await page.waitForNavigation({ waitUntil: state, timeout: msg.timeoutMs || this.timeout });
+          const state = msg.loadState === 'networkidle' ? 'networkidle' : msg.loadState as 'load' | 'domcontentloaded';
+          await page.waitForLoadState(state, { timeout: msg.timeoutMs || this.timeout });
           return `Page reached ${msg.loadState}`;
         }
         if (msg.fn) {
@@ -292,7 +314,7 @@ export class Engine {
       }
 
       case 'resize': {
-        await page.setViewport({ width: msg.width!, height: msg.height! });
+        await page.setViewportSize({ width: msg.width!, height: msg.height! });
         return `Resized to ${msg.width}x${msg.height}`;
       }
 
@@ -326,16 +348,8 @@ export class Engine {
       }
 
       case 'pdf': {
-        const cdp = await page.createCDPSession();
-        try {
-          const { data } = await cdp.send('Page.printToPDF', {
-            printBackground: true,
-            preferCSSPageSize: true,
-          });
-          return data;
-        } finally {
-          await cdp.detach();
-        }
+        const buf = await page.pdf({ printBackground: true });
+        return Buffer.from(buf).toString('base64');
       }
 
       default:
@@ -344,16 +358,17 @@ export class Engine {
   }
 
   private async snapshot(page: Page): Promise<string> {
-    const cdp = await page.createCDPSession();
+    // Use CDP session for accessibility tree (page.accessibility is deprecated)
+    const cdp = await page.context().newCDPSession(page);
     try {
-      const { nodes } = await cdp.send('Accessibility.getFullAXTree');
-      return this.formatAXTree(nodes);
+      const { nodes } = await cdp.send('Accessibility.getFullAXTree') as { nodes: any[] };
+      return this.formatAXTreeFlat(nodes);
     } finally {
       await cdp.detach();
     }
   }
 
-  private formatAXTree(nodes: any[]): string {
+  private formatAXTreeFlat(nodes: any[]): string {
     const lines: string[] = [];
     for (const node of nodes) {
       const name = node.name?.value || '';
@@ -379,14 +394,21 @@ export class Engine {
     return lines.join('\n');
   }
 
-  private async findByRef(page: Page, ref: string) {
+  private async findByRef(page: Page, ref: string): Promise<ElementHandle> {
     const escaped = ref.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-    const el = await page.$(`[aria-label="${escaped}"]`)
-      || await page.$(`[name="${escaped}"]`)
-      || await page.$(`[id="${escaped}"]`)
-      || await page.$(`[placeholder="${escaped}"]`)
-      || await page.$(`::-p-text(${escaped})`);
+    let el = await page.$(`[aria-label="${escaped}"]`)
+      ?? await page.$(`[name="${escaped}"]`)
+      ?? await page.$(`[id="${escaped}"]`)
+      ?? await page.$(`[placeholder="${escaped}"]`);
+
+    if (!el) {
+      // Fallback to text content via locator
+      const loc = page.getByText(ref, { exact: false });
+      if (await loc.count() > 0) {
+        el = await loc.first().elementHandle();
+      }
+    }
 
     if (!el) throw new Error(`Element not found: ${ref}`);
     return el;
