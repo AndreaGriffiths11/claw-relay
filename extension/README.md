@@ -37,7 +37,7 @@ git clone https://github.com/AndreaGriffiths11/claw-relay.git
 ## Setup
 
 1. Click the **Claw Relay** icon in your toolbar
-2. Enter your relay server URL and API key (get these from your relay server config or [clawrelay.dev/dashboard](https://clawrelay.dev/dashboard))
+2. Enter your relay server URL and token (find these in your `config.yaml`)
 3. Click **Save**
 4. The badge should show **ON** when connected to the relay server
 
@@ -61,5 +61,7 @@ git clone https://github.com/AndreaGriffiths11/claw-relay.git
 | Badge disappears | The service worker may have gone idle. Click the extension icon to wake it up. |
 | Changes not reflecting | Hit the refresh icon on `chrome://extensions` after pulling updates. |
 | Permission errors | Make sure the host permissions in `manifest.json` match your relay server URL. |
-ifest.json` match your relay server URL. |
-permissions in `manifest.json` match your relay server URL. |
+
+## How It Works
+
+The extension bridges your existing Chrome tabs to your AI agent through your local Claw Relay server. No cloud service needed — everything runs on your machine.
