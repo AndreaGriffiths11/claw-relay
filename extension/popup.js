@@ -15,8 +15,24 @@ const agentScopes = document.getElementById('agentScopes');
 const actionsList = document.getElementById('actionsList');
 const toggleBtn = document.getElementById('toggleBtn');
 
-let paused = false;
+// Bridge elements
+const bridgeDot = document.getElementById('bridgeDot');
+const bridgeStatus = document.getElementById('bridgeStatus');
+const bridgeConnectBtn = document.getElementById('bridgeConnectBtn');
+const attachBtn = document.getElementById('attachBtn');
+const attachedTabsList = document.getElementById('attachedTabsList');
 
+let paused = false;
+let currentTabId = null;
+let bridgeState = { attachedTabs: [], wsConnected: false };
+
+// ── Get current tab ───────────────────────────────────────
+async function getCurrentTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab;
+}
+
+// ── Relay health check (original) ─────────────────────────
 async function checkRelay() {
   try {
     const headers = {};
@@ -79,7 +95,111 @@ function updateActions(actions) {
   }).join('');
 }
 
-// Load state
+// ── Bridge UI ─────────────────────────────────────────────
+function updateBridgeUI() {
+  // WS status
+  bridgeDot.className = `dot ${bridgeState.wsConnected ? 'blue' : 'red'}`;
+  bridgeStatus.textContent = bridgeState.wsConnected ? 'Bridge Connected' : 'Disconnected';
+  bridgeConnectBtn.textContent = bridgeState.wsConnected ? 'Disconnect' : 'Connect';
+  if (bridgeState.wsConnected) {
+    bridgeConnectBtn.classList.add('danger');
+  } else {
+    bridgeConnectBtn.classList.remove('danger');
+  }
+
+  // Attach button
+  const isAttached = currentTabId && bridgeState.attachedTabs.includes(currentTabId);
+  if (isAttached) {
+    attachBtn.textContent = '🔓 Detach This Tab';
+    attachBtn.classList.add('detach');
+  } else {
+    attachBtn.textContent = '🔗 Attach This Tab';
+    attachBtn.classList.remove('detach');
+  }
+
+  // Attached tabs list
+  if (bridgeState.attachedTabs.length === 0) {
+    attachedTabsList.innerHTML = '';
+    return;
+  }
+
+  // Fetch tab info for attached tabs
+  Promise.all(bridgeState.attachedTabs.map(tabId =>
+    chrome.tabs.get(tabId).catch(() => null)
+  )).then(tabs => {
+    attachedTabsList.innerHTML = '';
+    tabs.forEach((tab, i) => {
+      if (!tab) return;
+      const li = document.createElement('li');
+      li.className = 'tab-item';
+      li.innerHTML = `
+        <div class="tab-info">
+          ${tab.favIconUrl ? `<img class="tab-favicon" src="${tab.favIconUrl}" alt="">` : '<span class="tab-favicon">🌐</span>'}
+          <span class="tab-title" title="${tab.title || ''}">${tab.title || 'Untitled'}</span>
+        </div>
+        <button class="tab-detach-btn" data-tab-id="${tab.id}">✕</button>
+      `;
+      attachedTabsList.appendChild(li);
+    });
+
+    // Detach buttons
+    attachedTabsList.querySelectorAll('.tab-detach-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = parseInt(btn.dataset.tabId, 10);
+        chrome.runtime.sendMessage({ type: 'detach-tab', tabId }, () => {
+          refreshBridgeState();
+        });
+      });
+    });
+  });
+}
+
+function refreshBridgeState() {
+  chrome.runtime.sendMessage({ type: 'get-bridge-state' }, (response) => {
+    if (response) {
+      bridgeState = response;
+      updateBridgeUI();
+    }
+  });
+}
+
+// ── Bridge event listeners ────────────────────────────────
+bridgeConnectBtn.addEventListener('click', () => {
+  if (bridgeState.wsConnected) {
+    chrome.runtime.sendMessage({ type: 'disconnect-bridge' }, () => {
+      refreshBridgeState();
+    });
+  } else {
+    chrome.runtime.sendMessage({ type: 'connect-bridge' }, () => {
+      setTimeout(refreshBridgeState, 500);
+    });
+  }
+});
+
+attachBtn.addEventListener('click', async () => {
+  if (!currentTabId) return;
+  const isAttached = bridgeState.attachedTabs.includes(currentTabId);
+  const msgType = isAttached ? 'detach-tab' : 'attach-tab';
+  chrome.runtime.sendMessage({ type: msgType, tabId: currentTabId }, (response) => {
+    if (response?.error) {
+      console.error('Bridge error:', response.error);
+    }
+    refreshBridgeState();
+  });
+});
+
+// Listen for state broadcasts from background
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'bridge-state') {
+    bridgeState = {
+      attachedTabs: msg.attachedTabs || [],
+      wsConnected: msg.wsConnected || false
+    };
+    updateBridgeUI();
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────
 chrome.storage.sync.get(DEFAULTS, (syncResult) => {
   const url = syncResult.relayUrl || DEFAULTS.relayUrl;
   RELAY_URL = url.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:').replace(/\/$/, '');
@@ -95,6 +215,22 @@ chrome.storage.sync.get(DEFAULTS, (syncResult) => {
   checkRelay();
 });
 
+// Get current tab and init bridge UI
+getCurrentTab().then(tab => {
+  if (tab) currentTabId = tab.id;
+  refreshBridgeState();
+});
+
+// Dashboard link — auto-derive from relay URL (port + 1)
+document.getElementById('dashboardLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  const wsUrl = RELAY_URL.replace(/^wss?:/, 'http').replace(/\/$/, '');
+  const match = wsUrl.match(/:(\d+)/);
+  const dashPort = match ? parseInt(match[1], 10) + 1 : 9334;
+  const dashUrl = wsUrl.replace(/:\d+/, ':' + dashPort);
+  chrome.tabs.create({ url: dashUrl });
+});
+
 // Settings link
 document.getElementById('settingsLink').addEventListener('click', (e) => {
   e.preventDefault();
@@ -105,7 +241,6 @@ toggleBtn.addEventListener('click', () => {
   paused = !paused;
   chrome.storage.local.set({ paused });
   updateToggle();
-  // Notify background
   chrome.runtime.sendMessage({ type: 'toggle', paused });
 });
 
@@ -114,5 +249,6 @@ function updateToggle() {
   toggleBtn.className = `toggle-btn${paused ? ' paused' : ''}`;
 }
 
-// Poll every 5 seconds while popup is open
+// Poll while popup open
 setInterval(checkRelay, 5000);
+setInterval(refreshBridgeState, 3000);
