@@ -16,7 +16,7 @@ Thanks for wanting to contribute! Here's how to get started.
    ```
 5. Test locally — start the relay, verify your changes work:
    ```bash
-   bun src/cli.ts
+   cd relay-server && bun src/cli.ts
    ```
 6. Open a PR against `main`
 
