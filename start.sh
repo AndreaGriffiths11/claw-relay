@@ -18,6 +18,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Clean up stale processes from previous runs
+if lsof -ti:"$PORT" >/dev/null 2>&1; then
+  echo "🧹 Killing stale process on port $PORT..."
+  lsof -ti:"$PORT" | xargs kill 2>/dev/null
+  sleep 1
+fi
+DASH_PORT=$((PORT + 1))
+if lsof -ti:"$DASH_PORT" >/dev/null 2>&1; then
+  lsof -ti:"$DASH_PORT" | xargs kill 2>/dev/null
+  sleep 1
+fi
+
 echo "🦞 Claw Relay Starting..."
 echo ""
 
