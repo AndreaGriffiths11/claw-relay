@@ -137,6 +137,12 @@ npx claw-relay [options]
 
 ## First-Time Agent Setup
 
+> **💡 Quickest setup with GitHub Copilot CLI:**
+> ```bash
+> copilot --additional-mcp-config '{"mcpServers":{"claw-relay":{"command":"node","args":["mcp/claw-relay-mcp.js"],"env":{"CLAW_RELAY_URL":"ws://localhost:9333","CLAW_RELAY_TOKEN":"your-token","CLAW_RELAY_AGENT":"your-agent-id"}}}}'
+> ```
+> That's it — Copilot CLI loads the MCP server and you're ready to browse. [Get Copilot CLI free →](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
+
 1. Add your agent to `config.yaml` with a token, scopes, and allowlist
 2. Restart the relay (config is read at startup)
 3. Connect using your platform's method (MCP or OpenClaw skill)
