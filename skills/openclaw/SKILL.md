@@ -7,7 +7,13 @@ description: Control a remote browser through Claw Relay using the CLI client. U
 
 > **If your platform supports MCP (Copilot CLI, Claude Desktop, Gemini CLI), use `skills/browser/SKILL.md` instead.** This skill is for OpenClaw, nanobot, ZeroClaw, and other agents that call tools via `exec`.
 
-You control a real Chrome browser on the user's machine through a CLI script. The browser has their real cookies and sessions. You run anywhere — cloud, server, container.
+## ⚠️ IMPORTANT: No MCP Required
+
+**Do NOT write an MCP server, bridge, or wrapper.** You already have everything you need:
+- The `exec` tool (built into OpenClaw)
+- The `relay-client.cjs` script (in this folder)
+
+That's it. One `exec` call per browser action. No MCP, no bridge, no custom server.
 
 ## Setup
 
@@ -104,13 +110,17 @@ node relay-client.cjs evaluate "document.title"
 
 ## OpenClaw exec Integration
 
-From an OpenClaw agent, use the `exec` tool:
+Use the `exec` tool directly. Each call connects, authenticates, performs one action, and exits:
 
-```
+```bash
 exec: node /path/to/relay-client.cjs snapshot
+exec: node /path/to/relay-client.cjs navigate https://github.com
+exec: node /path/to/relay-client.cjs click e3
 ```
 
 Set `CLAW_RELAY_URL`, `CLAW_RELAY_TOKEN`, and `CLAW_RELAY_AGENT` in your environment or pass them as flags each time.
+
+**Do NOT try to keep a persistent connection, start a background process, or write wrapper scripts.** The CLI handles connection lifecycle automatically.
 
 ## Security Constraints
 
