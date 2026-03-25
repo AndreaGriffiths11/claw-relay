@@ -59,9 +59,25 @@ Works with **Copilot CLI**, **OpenClaw**, **Claude Code**, **nanobot**, **ZeroCl
 }
 ```
 
-### WebSocket (OpenClaw, nanobot, ZeroClaw, custom agents)
+### OpenClaw Skill (OpenClaw, nanobot, ZeroClaw)
 
-Connect directly via WebSocket — no MCP required:
+Use the bundled CLI client — no MCP required:
+
+```bash
+export CLAW_RELAY_URL="ws://localhost:9333"
+export CLAW_RELAY_TOKEN="your-token"
+export CLAW_RELAY_AGENT="your-agent"
+
+node skills/openclaw/relay-client.js navigate https://github.com
+node skills/openclaw/relay-client.js snapshot
+node skills/openclaw/relay-client.js click e3
+```
+
+See [`skills/openclaw/SKILL.md`](skills/openclaw/SKILL.md) for the full agent skill reference.
+
+### WebSocket (custom agents)
+
+Connect directly via WebSocket for full control:
 
 ```javascript
 const ws = new WebSocket('ws://localhost:9333');
