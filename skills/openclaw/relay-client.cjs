@@ -28,27 +28,27 @@ function parseArgs(argv) {
 function buildAction(action, actionArgs) {
   switch (action) {
     case 'navigate':
-      return { type: 'action', action: 'browser_navigate', params: { url: actionArgs[0] } };
+      return { type: 'navigate', url: actionArgs[0] };
     case 'snapshot':
-      return { type: 'action', action: 'browser_snapshot', params: {} };
+      return { type: 'snapshot' };
     case 'screenshot':
-      return { type: 'action', action: 'browser_screenshot', params: {} };
+      return { type: 'screenshot' };
     case 'click':
-      return { type: 'action', action: 'browser_click', params: { ref: actionArgs[0] } };
+      return { type: 'click', ref: actionArgs[0] };
     case 'fill':
-      return { type: 'action', action: 'browser_fill', params: { ref: actionArgs[0], text: actionArgs.slice(1).join(' ') } };
+      return { type: 'fill', ref: actionArgs[0], text: actionArgs.slice(1).join(' ') };
     case 'type':
-      return { type: 'action', action: 'browser_type', params: { ref: actionArgs[0], text: actionArgs.slice(1).join(' ') } };
+      return { type: 'type', ref: actionArgs[0], text: actionArgs.slice(1).join(' ') };
     case 'press':
-      return { type: 'action', action: 'browser_press', params: { key: actionArgs[0] } };
+      return { type: 'press', key: actionArgs[0] };
     case 'hover':
-      return { type: 'action', action: 'browser_hover', params: { ref: actionArgs[0] } };
+      return { type: 'hover', ref: actionArgs[0] };
     case 'select':
-      return { type: 'action', action: 'browser_select', params: { ref: actionArgs[0], values: actionArgs.slice(1) } };
+      return { type: 'select', ref: actionArgs[0], values: actionArgs.slice(1) };
     case 'evaluate':
-      return { type: 'action', action: 'browser_evaluate', params: { expression: actionArgs.join(' ') } };
+      return { type: 'evaluate', js: actionArgs.join(' ') };
     case 'close':
-      return { type: 'action', action: 'browser_close', params: {} };
+      return { type: 'close' };
     default:
       console.error(JSON.stringify({ error: `Unknown action: ${action}`, actions: ['navigate','snapshot','screenshot','click','fill','type','press','hover','select','evaluate','close'] }));
       process.exit(1);

@@ -19,12 +19,12 @@ export CLAW_RELAY_TOKEN="your-token"
 export CLAW_RELAY_AGENT="your-agent-id"
 ```
 
-The client script is at `skills/openclaw/relay-client.js` in the claw-relay repo.
+The client script is at `skills/openclaw/relay-client.cjs` in the claw-relay repo.
 
 ## Usage
 
 ```bash
-node relay-client.js [--url URL] [--token TOKEN] [--agent-id ID] ACTION [ARGS...]
+node relay-client.cjs [--url URL] [--token TOKEN] [--agent-id ID] ACTION [ARGS...]
 ```
 
 Flags override env vars. Every invocation connects, authenticates, performs ONE action, prints JSON, and exits.
@@ -60,46 +60,46 @@ navigate → snapshot → find ref → act → snapshot → verify
 
 ```bash
 # Step 1: Navigate
-node relay-client.js navigate https://github.com
+node relay-client.cjs navigate https://github.com
 
 # Step 2: Snapshot to find the search input ref
-node relay-client.js snapshot
+node relay-client.cjs snapshot
 
 # Step 3: Fill the search box (say ref is e3)
-node relay-client.js fill e3 claw-relay
+node relay-client.cjs fill e3 claw-relay
 
 # Step 4: Press Enter
-node relay-client.js press Enter
+node relay-client.cjs press Enter
 
 # Step 5: Snapshot to read results
-node relay-client.js snapshot
+node relay-client.cjs snapshot
 ```
 
 ### Example: Click a Button
 
 ```bash
 # Find the button
-node relay-client.js snapshot
+node relay-client.cjs snapshot
 # Output shows button at ref e7
 
 # Click it
-node relay-client.js click e7
+node relay-client.cjs click e7
 
 # Verify
-node relay-client.js snapshot
+node relay-client.cjs snapshot
 ```
 
 ### Example: Take a Screenshot
 
 ```bash
-node relay-client.js screenshot /tmp/page.png
+node relay-client.cjs screenshot /tmp/page.png
 # Output: {"ok":true,"path":"/tmp/page.png","bytes":...}
 ```
 
 ### Example: Run JavaScript
 
 ```bash
-node relay-client.js evaluate "document.title"
+node relay-client.cjs evaluate "document.title"
 ```
 
 ## OpenClaw exec Integration
@@ -107,7 +107,7 @@ node relay-client.js evaluate "document.title"
 From an OpenClaw agent, use the `exec` tool:
 
 ```
-exec: node /path/to/relay-client.js snapshot
+exec: node /path/to/relay-client.cjs snapshot
 ```
 
 Set `CLAW_RELAY_URL`, `CLAW_RELAY_TOKEN`, and `CLAW_RELAY_AGENT` in your environment or pass them as flags each time.

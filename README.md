@@ -68,9 +68,9 @@ export CLAW_RELAY_URL="ws://localhost:9333"
 export CLAW_RELAY_TOKEN="your-token"
 export CLAW_RELAY_AGENT="your-agent"
 
-node skills/openclaw/relay-client.js navigate https://github.com
-node skills/openclaw/relay-client.js snapshot
-node skills/openclaw/relay-client.js click e3
+node skills/openclaw/relay-client.cjs navigate https://github.com
+node skills/openclaw/relay-client.cjs snapshot
+node skills/openclaw/relay-client.cjs click e3
 ```
 
 See [`skills/openclaw/SKILL.md`](skills/openclaw/SKILL.md) for the full agent skill reference.
