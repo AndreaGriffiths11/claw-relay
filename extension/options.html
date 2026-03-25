@@ -93,19 +93,19 @@
 <body>
   <div class="container">
     <h1>🦞 Claw <span>Relay</span> Settings</h1>
-    <p class="subtitle">Configure your relay connection</p>
+    <p class="subtitle">Connect to your local relay server</p>
 
     <label for="relayUrl">Relay URL</label>
-    <input type="text" id="relayUrl" placeholder="wss://clawrelay.dev/ws">
+    <input type="text" id="relayUrl" placeholder="ws://localhost:9333">
     <div class="hint">Default: ws://localhost:9333</div>
 
-    <label for="apiKey">API Key</label>
-    <input type="password" id="apiKey" placeholder="Your relay API key">
-    <div class="hint">Token for authenticating with the relay server</div>
+    <label for="apiKey">Token</label>
+    <input type="password" id="apiKey" placeholder="Your relay token">
+    <div class="hint">From the <code>token</code> field in your config.yaml</div>
 
     <label for="agentId">Agent ID</label>
     <input type="text" id="agentId" placeholder="my-agent">
-    <div class="hint">Default: my-agent</div>
+    <div class="hint">Must match an agent name in your config.yaml</div>
 
     <div class="actions">
       <button id="saveBtn">Save</button>
