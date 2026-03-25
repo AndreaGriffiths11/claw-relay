@@ -114,7 +114,7 @@ export class Engine {
         const cdp = await page.createCDPSession();
         try {
           const { data } = await cdp.send('Page.captureScreenshot', {
-            format: msg.imageType || 'png',
+            format: (msg.imageType as 'png' | 'jpeg' | 'webp') || 'png',
             captureBeyondViewport: msg.fullPage || false,
           });
           return data;
@@ -209,7 +209,7 @@ export class Engine {
 
       case 'scrollIntoView': {
         const el = await this.findElement(page, msg.ref, msg.selector);
-        await el.evaluate((node: Element) => node.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+        await el.evaluate('(node) => node.scrollIntoView({ block: "center", behavior: "smooth" })');
         return `Scrolled ${msg.ref || msg.selector} into view`;
       }
 
@@ -220,17 +220,15 @@ export class Engine {
         }
         if (msg.text) {
           await page.waitForFunction(
-            (t: string) => document.body?.innerText?.includes(t),
-            { timeout: msg.timeoutMs || this.timeout },
-            msg.text
+            `document.body && document.body.innerText.includes(${JSON.stringify(msg.text)})`,
+            { timeout: msg.timeoutMs || this.timeout }
           );
           return `Text "${msg.text}" appeared`;
         }
         if (msg.textGone) {
           await page.waitForFunction(
-            (t: string) => !document.body?.innerText?.includes(t),
-            { timeout: msg.timeoutMs || this.timeout },
-            msg.textGone
+            `!(document.body && document.body.innerText.includes(${JSON.stringify(msg.textGone)}))`,
+            { timeout: msg.timeoutMs || this.timeout }
           );
           return `Text "${msg.textGone}" gone`;
         }
@@ -240,9 +238,8 @@ export class Engine {
         }
         if (msg.url) {
           await page.waitForFunction(
-            (u: string) => window.location.href.includes(u),
-            { timeout: msg.timeoutMs || this.timeout },
-            msg.url
+            `window.location.href.includes(${JSON.stringify(msg.url)})`,
+            { timeout: msg.timeoutMs || this.timeout }
           );
           return `URL contains "${msg.url}"`;
         }
