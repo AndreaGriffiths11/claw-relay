@@ -5,7 +5,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
-import { serveStatic } from '@hono/node-server/serve-static';
 import * as fs from 'fs';
 import * as path from 'path';
 import { dirname } from 'path';
@@ -248,26 +247,49 @@ export function startDashboard(
     return c.json({ ok: true });
   });
 
-  // Serve built SPA from dashboard/dist, fall back to status page
+  // Serve built SPA from dashboard/dist
+  // Re-check dist on every request so a build mid-run picks up immediately
   const distDir = path.join(__dirname, '..', 'dashboard', 'dist');
-  const distExists = fs.existsSync(path.join(distDir, 'index.html'));
 
-  if (distExists) {
-    // Serve static assets
-    app.use('/assets/*', serveStatic({ root: distDir.replace(/\/+$/, '') + '/' }));
+  const MIME: Record<string, string> = {
+    '.js': 'application/javascript',
+    '.css': 'text/css',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.ico': 'image/x-icon',
+    '.json': 'application/json',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+  };
 
-    // SPA fallback
-    app.get('*', (c) => {
-      const html = fs.readFileSync(path.join(distDir, 'index.html'), 'utf-8');
+  // Serve static assets from dist (JS, CSS, etc.)
+  app.get('/assets/*', (c) => {
+    const filePath = path.join(distDir, c.req.path);
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath);
+      const content = fs.readFileSync(filePath);
+      return new Response(content, {
+        headers: {
+          'Content-Type': MIME[ext] || 'application/octet-stream',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+    return c.notFound();
+  });
+
+  // SPA fallback — serve index.html for all non-API routes
+  app.get('*', (c) => {
+    const indexPath = path.join(distDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      const html = fs.readFileSync(indexPath, 'utf-8');
       return c.html(html);
-    });
-  } else {
-    app.get('*', (c) => {
-      return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0a0a0f;color:#e2e8f0">
-        <div style="text-align:center"><h1>🦞 Claw Relay™ Dashboard</h1><p style="color:#94a3b8">Run <code style="color:#06b6d4">cd dashboard && npm run build</code> to enable the full dashboard UI.</p></div>
-      </body></html>`);
-    });
-  }
+    }
+    // Dashboard not built yet — show helpful message
+    return c.html(`<!DOCTYPE html><html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0a0a0f;color:#e2e8f0">
+      <div style="text-align:center"><h1>🦞 Claw Relay™ Dashboard</h1><p style="color:#94a3b8">Run <code style="color:#06b6d4">cd dashboard && npm run build</code> to enable the full dashboard UI.</p></div>
+    </body></html>`);
+  });
 
   serve({ fetch: app.fetch, port: config.dashboard.port });
   console.log(`Dashboard on http://localhost:${config.dashboard.port}`);
