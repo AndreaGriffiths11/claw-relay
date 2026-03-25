@@ -102,6 +102,15 @@ An experimental Rust implementation is available at [claw-relay-core](https://gi
 
 > ⚠️ **Experimental and not actively maintained.** Use the main TypeScript package for production.
 
+## Built With
+
+- [Bun](https://bun.sh) — runtime
+- [Hono](https://hono.dev) — HTTP framework
+- [Puppeteer](https://pptr.dev) — Chrome CDP integration
+- [Railway](https://railway.com?referralCode=a2vuTz) — cloud hosting
+- [Cloudflare Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — secure remote access
+- [TanStack Router](https://tanstack.com/router) — dashboard SPA
+
 ## License
 
 MIT
