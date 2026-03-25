@@ -9,14 +9,40 @@ export interface AuthMessage {
 }
 
 export interface ActionMessage {
-  type: 'snapshot' | 'click' | 'fill' | 'navigate' | 'screenshot' | 'evaluate' | 'press' | 'hover' | 'select' | 'type' | 'close';
+  type: 'snapshot' | 'click' | 'fill' | 'navigate' | 'screenshot' | 'evaluate' | 'press' | 'hover' | 'select' | 'type' | 'close' | 'drag' | 'scrollIntoView' | 'wait' | 'resize' | 'batch' | 'console' | 'network' | 'pdf';
   ref?: string;
+  selector?: string;
   text?: string;
   url?: string;
   js?: string;
   key?: string;
   values?: string[];
   request_id?: string;
+  targetId?: string;
+  doubleClick?: boolean;
+  button?: string;
+  modifiers?: string[];
+  delayMs?: number;
+  timeoutMs?: number;
+  startRef?: string;
+  endRef?: string;
+  textGone?: string;
+  loadState?: string;
+  fn?: string;
+  timeMs?: number;
+  width?: number;
+  height?: number;
+  fields?: Array<{ ref: string; type: string; value?: string | number | boolean }>;
+  actions?: ActionMessage[];
+  stopOnError?: boolean;
+  submit?: boolean;
+  slowly?: boolean;
+  fullPage?: boolean;
+  element?: string;
+  imageType?: string;
+  level?: string;
+  filter?: string;
+  clear?: boolean;
 }
 
 export interface ResultMessage {
@@ -26,6 +52,7 @@ export interface ResultMessage {
   data?: string;
   request_id?: string;
   mimeType?: string;
+  targetId?: string;
 }
 
 export interface ErrorMessage {
@@ -41,6 +68,7 @@ export type OutgoingMessage = ResultMessage | ErrorMessage | { type: 'ping' };
 const VALID_TYPES = new Set([
   'auth', 'snapshot', 'click', 'fill', 'navigate', 'screenshot',
   'evaluate', 'press', 'hover', 'select', 'type', 'close', 'pong',
+  'drag', 'scrollIntoView', 'wait', 'resize', 'batch', 'console', 'network', 'pdf',
 ]);
 
 export function parseMessage(raw: string): IncomingMessage | null {
@@ -60,20 +88,23 @@ export function isAuthMessage(msg: IncomingMessage): msg is AuthMessage {
     && typeof (msg as AuthMessage).agent_id === 'string';
 }
 
-// Fields that must be present for each action type.
-// Actions not listed here (snapshot, screenshot, close) need no extra fields.
 const REQUIRED_FIELDS: Record<string, readonly string[]> = {
-  click: ['ref'],
-  hover: ['ref'],
-  fill: ['ref', 'text'],
-  type: ['ref', 'text'],
+  click: [],
+  hover: [],
+  fill: [],
+  type: [],
   navigate: ['url'],
-  evaluate: ['js'],
+  evaluate: [],
   press: ['key'],
-  select: ['ref'],
+  select: [],
+  drag: [],
+  scrollIntoView: [],
+  wait: [],
+  resize: ['width', 'height'],
+  batch: ['actions'],
 };
 
-const ACTIONS = new Set(Object.keys(REQUIRED_FIELDS).concat('snapshot', 'screenshot', 'close'));
+const ACTIONS = new Set(Object.keys(REQUIRED_FIELDS).concat('snapshot', 'screenshot', 'close', 'console', 'network', 'pdf'));
 
 export function isActionMessage(msg: IncomingMessage): msg is ActionMessage {
   if (!ACTIONS.has(msg.type)) return false;
@@ -82,7 +113,7 @@ export function isActionMessage(msg: IncomingMessage): msg is ActionMessage {
   if (!required) return true;
 
   for (const field of required) {
-    if (typeof (msg as Record<string, unknown>)[field] !== 'string') return false;
+    if ((msg as Record<string, unknown>)[field] === undefined) return false;
   }
   return true;
 }

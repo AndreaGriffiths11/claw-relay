@@ -81,7 +81,7 @@ dashboard:
   port: ${port + 1}
   adminToken: "${adminToken}"
 `;
-  fs.writeFileSync(configPath, config, 'utf-8');
+  fs.writeFileSync(configPath, config, { encoding: 'utf-8', mode: 0o600 });
   console.log(`📝 Generated config at ${configPath}`);
 
   // Pass tokens to banner via env (avoids polluting globalThis)

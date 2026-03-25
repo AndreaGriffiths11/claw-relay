@@ -22,6 +22,19 @@ Launches a dedicated Chrome window, starts the relay, generates config with rand
 
 Claw Relay sits between your AI agent and Chrome. The agent sends actions (navigate, click, read) via WebSocket — the relay enforces auth, permissions, rate limits, and site restrictions before forwarding to Chrome via CDP.
 
+### Capabilities
+
+- **Navigation & snapshots** — browse pages, read accessibility trees
+- **Element interaction** — click, type, fill, hover, select, drag & drop
+- **Screenshots** — full page, viewport, or individual elements
+- **Batch actions** — execute multiple actions in a single message
+- **Tab targeting** — pin actions to specific tabs via `targetId`
+- **Wait conditions** — wait for text, selectors, navigation, network idle, or custom JS
+- **Console & network monitoring** — capture logs and requests
+- **PDF generation** — render pages to PDF
+- **Viewport resize** — test responsive layouts
+- **JavaScript evaluation** — run arbitrary code in page context
+
 ## Connect Your Agent
 
 Use the MCP server for Claude Desktop, Copilot CLI, or any MCP client:

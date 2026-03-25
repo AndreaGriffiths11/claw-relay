@@ -4,15 +4,25 @@
 
 import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { ActionMessage } from './protocol';
+import { isAllowed } from './allowlist';
 
 export class Engine {
   private browser: Browser | null = null;
   private readonly timeout: number;
   private readonly cdpUrl: string;
+  private blocklist: string[] = [];
+  private allowlists: Map<string, string[]> = new Map();
+  private currentAgentId: string | null = null;
 
   constructor(timeout: number, cdpUrl = 'http://127.0.0.1:9222') {
     this.timeout = timeout;
     this.cdpUrl = cdpUrl;
+  }
+
+  setRestrictions(agentId: string, allowlist: string[], blocklist: string[]): void {
+    this.blocklist = blocklist;
+    this.allowlists.set(agentId, allowlist);
+    this.currentAgentId = agentId;
   }
 
   private async getBrowser(): Promise<Browser> {
@@ -21,21 +31,45 @@ export class Engine {
     return this.browser;
   }
 
+  private listenedPages = new WeakSet<Page>();
+
+  private setupPageListeners(page: Page): void {
+    if (this.listenedPages.has(page)) return;
+    this.listenedPages.add(page);
+
+    page.on('framenavigated', async (frame) => {
+      if (frame !== page.mainFrame()) return;
+      const url = frame.url();
+      if (!url || url === 'about:blank') return;
+      const agentAllowlist = this.currentAgentId
+        ? this.allowlists.get(this.currentAgentId) || ['*']
+        : ['*'];
+      const check = isAllowed(url, agentAllowlist, this.blocklist);
+      if (!check.allowed) {
+        console.warn(`Blocked redirect to ${url} — navigating to about:blank`);
+        await page.goto('about:blank').catch(() => {});
+      }
+    });
+  }
+
   private async getActivePage(createIfMissing = false): Promise<Page> {
     const browser = await this.getBrowser();
     const pages = await browser.pages();
-    // Filter out extension pages, chrome:// pages, and devtools
     const browsable = pages.filter(p => {
       const url = p.url();
       return url.startsWith('http://') || url.startsWith('https://') || url === 'about:blank';
     });
     if (browsable.length === 0) {
       if (createIfMissing) {
-        return await browser.newPage();
+        const page = await browser.newPage();
+        this.setupPageListeners(page);
+        return page;
       }
       throw new Error('No browser tabs open');
     }
-    return browsable[browsable.length - 1];
+    const page = browsable[browsable.length - 1];
+    this.setupPageListeners(page);
+    return page;
   }
 
   async execute(msg: ActionMessage): Promise<{ ok: boolean; data?: string; error?: string }> {
