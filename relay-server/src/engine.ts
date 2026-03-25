@@ -24,8 +24,13 @@ export class Engine {
   private async getActivePage(): Promise<Page> {
     const browser = await this.getBrowser();
     const pages = await browser.pages();
-    if (pages.length === 0) throw new Error('No browser tabs open');
-    return pages[pages.length - 1];
+    // Filter out extension pages, chrome:// pages, and devtools
+    const browsable = pages.filter(p => {
+      const url = p.url();
+      return url.startsWith('http://') || url.startsWith('https://') || url === 'about:blank';
+    });
+    if (browsable.length === 0) throw new Error('No browser tabs open');
+    return browsable[browsable.length - 1];
   }
 
   async execute(msg: ActionMessage): Promise<{ ok: boolean; data?: string; error?: string }> {
