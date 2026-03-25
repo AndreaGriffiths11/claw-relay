@@ -221,6 +221,16 @@ getCurrentTab().then(tab => {
   refreshBridgeState();
 });
 
+// Dashboard link — auto-derive from relay URL (port + 1)
+document.getElementById('dashboardLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  const wsUrl = RELAY_URL.replace(/^wss?:/, 'http').replace(/\/$/, '');
+  const match = wsUrl.match(/:(\d+)/);
+  const dashPort = match ? parseInt(match[1], 10) + 1 : 9334;
+  const dashUrl = wsUrl.replace(/:\d+/, ':' + dashPort);
+  chrome.tabs.create({ url: dashUrl });
+});
+
 // Settings link
 document.getElementById('settingsLink').addEventListener('click', (e) => {
   e.preventDefault();
