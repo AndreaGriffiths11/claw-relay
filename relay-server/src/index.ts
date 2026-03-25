@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // --- Config ---
 
-const configPath = process.argv[2] || path.join(__dirname, '..', 'config.example.yaml');
+const configPath = path.resolve(process.argv[2] || path.join(__dirname, '..', 'config.yaml'));
 let config = loadConfig(configPath);
 
 export function reloadCurrentConfig(): void {
