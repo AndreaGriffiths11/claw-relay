@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Claw Relay™",
-  "version": "0.3.0",
-  "description": "Connect your browser tabs to your local Claw Relay server for AI agent automation.",
+  "version": "0.4.0",
+  "description": "Connect your browser tabs to your local Claw Relay server for AI agent automation. Attach tabs for real browser bridging via chrome.debugger.",
   "permissions": [
-    "storage"
+    "storage",
+    "debugger",
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
-    "http://localhost:*/*",
-    "http://127.0.0.1:*/*"
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",

@@ -1,67 +1,66 @@
-# Claw Relay — Browser Extension
+# Claw Relay™ — Chrome Extension
 
-Status dashboard for your browser toolbar. Shows connection status, recent agent actions, and relay health.
+Browser extension that connects your Chrome tabs to the Claw Relay server, enabling AI agents to automate your real browser tabs — including tabs where you're already logged in.
 
-> **Chrome Web Store submission is pending review.** In the meantime, you can install manually (see below).
+## What It Does
 
-The extension connects to your local relay server and bridges your existing Chrome tabs to your AI agent.
+### Status Monitor
+- Shows relay server health (online/offline)
+- Displays connected agent info and recent actions
+- Pause/resume health checks
 
-Works with **Chrome**, **Microsoft Edge**, and any Chromium-based browser.
-
-## Download
-
-**Option A:** Clone the whole repo:
-
-```bash
-git clone https://github.com/AndreaGriffiths11/claw-relay.git
-```
-
-**Option B:** Download just the `extension/` folder from GitHub — click **Code → Download ZIP**, then extract the `extension/` directory.
-
-## Install
-
-### Chrome
-1. Go to `chrome://extensions`
-
-### Microsoft Edge
-1. Go to `edge://extensions`
-
-### Then (both browsers):
-2. Toggle **Developer mode** ON (top-right corner)
-3. Click **Load unpacked**
-4. Select the `extension/` folder (the one containing `manifest.json`)
-5. The Claw Relay extension should now appear in your extensions list
-
-> **Tip:** Pin it to your toolbar — click the puzzle piece icon in Chrome's toolbar, then the pin icon next to Claw Relay.
-
-## Setup
-
-1. Click the **Claw Relay** icon in your toolbar
-2. Enter your relay server URL and token (find these in your `config.yaml`)
-3. Click **Save**
-4. The badge should show **ON** when connected to the relay server
-
-## Updating
-
-1. Pull the latest changes:
-   ```bash
-   cd claw-relay
-   git pull origin main
-   ```
-2. Go to `chrome://extensions`
-3. Click the **refresh icon** (↻) on the Claw Relay extension card
-4. Done — no need to remove and re-add
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| Extension won't load | Make sure you selected the `extension/` folder (not the repo root). Check that `manifest.json` is directly inside the folder you picked. |
-| Badge shows **OFF** | Relay server isn't running or URL/key is wrong. Open the popup and verify your settings. Check that the relay server is reachable. |
-| Badge disappears | The service worker may have gone idle. Click the extension icon to wake it up. |
-| Changes not reflecting | Hit the refresh icon on `chrome://extensions` after pulling updates. |
-| Permission errors | Make sure the host permissions in `manifest.json` match your relay server URL. |
+### Tab Bridge (chrome.debugger)
+- **Attach tabs** for AI agent control via the toolbar popup
+- Executes CDP commands through `chrome.debugger` API
+- Supports: snapshot, screenshot, click, fill, type, press, navigate, evaluate
+- Implements the same ref-map system (`e0`, `e1`, `data-claw-ref`) as the main engine
 
 ## How It Works
 
-The extension bridges your existing Chrome tabs to your AI agent through your local Claw Relay server. No cloud service needed — everything runs on your machine.
+1. Configure relay URL and token in Settings
+2. Click **Connect** in the popup to open a WebSocket to the relay
+3. Click **🔗 Attach This Tab** on any tab you want agents to control
+4. The badge shows the number of attached tabs
+5. Agents send actions through the relay → extension executes via CDP → results go back
+
+## Permissions
+
+| Permission | Why |
+|---|---|
+| `storage` | Save relay URL, token, settings |
+| `debugger` | Chrome DevTools Protocol access to attached tabs |
+| `activeTab` | Know which tab is currently active |
+| `tabs` | List and query tab info (title, favicon) |
+| `<all_urls>` | Required for `chrome.debugger` to work on any site |
+
+## Supported Actions
+
+| Action | Description |
+|---|---|
+| `snapshot` | Accessibility tree with ref-mapped interactive elements |
+| `screenshot` | Full-page PNG screenshot via CDP |
+| `click` | Click element by ref or CSS selector |
+| `fill` | Clear field and insert text |
+| `type` | Type text character by character |
+| `press` | Press a single key |
+| `navigate` | Navigate to a URL |
+| `evaluate` | Execute JavaScript and return result |
+
+## Ref System
+
+Matches the engine.ts ref system:
+- Interactive roles: textbox, button, link, checkbox, radio, combobox, menuitem, tab, switch, slider, searchbox, option, listbox, menu, tree, treeitem, heading
+- Sequential refs: `e0`, `e1`, `e2`...
+- Injects `data-claw-ref` attributes on DOM nodes
+- Output format: `[e0] button "Submit" (focused)`
+
+## Install
+
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked** → select this `extension/` folder
+4. Configure relay URL and token in the extension's Settings page
+
+## Architecture Note
+
+This PR implements the **extension side only**. The relay server does not yet route actions to the extension — that comes in a follow-up PR. The WebSocket connection and action handling are fully implemented and ready for relay-side integration.
