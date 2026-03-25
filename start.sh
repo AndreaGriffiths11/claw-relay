@@ -41,7 +41,7 @@ if [ "$TUNNEL" = "cloudflare" ] && ! command -v cloudflared >/dev/null 2>&1; the
 if [ -n "$MISSING" ]; then
   echo "✗ Missing:$MISSING"
   echo ""
-  command -v node >/dev/null 2>&1 || echo "  Install Node: https://nodejs.org
+  command -v node >/dev/null 2>&1 || echo "  Install Node: https://nodejs.org"
   command -v cloudflared >/dev/null 2>&1 || echo "  Install cloudflared: brew install cloudflared"
   echo ""
   exit 1
