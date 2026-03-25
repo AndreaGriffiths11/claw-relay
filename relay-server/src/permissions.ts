@@ -4,15 +4,23 @@
 const SCOPE_MAP: Record<string, string> = {
   snapshot: 'read',
   screenshot: 'read',
+  console: 'read',
+  network: 'read',
+  pdf: 'read',
   click: 'interact',
   type: 'interact',
   fill: 'interact',
   press: 'interact',
   hover: 'interact',
   select: 'interact',
+  drag: 'interact',
+  scrollIntoView: 'interact',
   navigate: 'navigate',
   close: 'navigate',
+  resize: 'navigate',
   evaluate: 'execute',
+  wait: 'read',
+  batch: 'interact',
 };
 
 export function hasPermission(scopes: readonly string[], action: string): boolean {

@@ -1,10 +1,14 @@
-#!/usr/bin/env bun
-// CLI entry point for `bunx claw-relay` / `npx claw-relay`
+#!/usr/bin/env node
+// CLI entry point for `npx claw-relay`
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 import * as crypto from 'node:crypto';
 import { spawn, execSync } from 'child_process';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // --- Parse CLI flags ---
 const args = process.argv.slice(2);
@@ -28,7 +32,7 @@ for (let i = 0; i < args.length; i++) {
       console.log(`
   claw-relay — Give your AI agents a real browser.
 
-  Usage: bunx claw-relay [options]
+  Usage: npx claw-relay [options]
 
   Options:
     --port <number>    Relay server port (default: 9333)
@@ -84,7 +88,6 @@ dashboard:
   fs.writeFileSync(configPath, config, { encoding: 'utf-8', mode: 0o600 });
   console.log(`📝 Generated config at ${configPath}`);
 
-  // Pass tokens to banner via env (avoids polluting globalThis)
   process.env._CLAW_GENERATED_AGENT_TOKEN = agentToken;
   process.env._CLAW_GENERATED_ADMIN_TOKEN = adminToken;
 }
@@ -105,7 +108,6 @@ function findChrome(): string | null {
     try { if (fs.existsSync(p)) return p; } catch {}
   }
 
-  // Try which
   for (const cmd of ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']) {
     try {
       const result = execSync(`which ${cmd} 2>/dev/null`, { encoding: 'utf-8' }).trim();
@@ -119,7 +121,6 @@ function findChrome(): string | null {
 let chromePid: number | undefined;
 
 async function launchChrome(): Promise<void> {
-  // Check if CDP is already available
   try {
     const res = await fetch('http://127.0.0.1:9222/json/version');
     if (res.ok) {
@@ -142,7 +143,6 @@ async function launchChrome(): Promise<void> {
       ? `${process.env.LOCALAPPDATA}\\.claw-relay\\chrome-data`
       : `${process.env.HOME}/.claw-relay/chrome-data`;
 
-  // Check if Claw Relay Chrome is already running
   const relayRunning = (() => {
     try {
       execSync('pgrep -f "claw-relay/chrome-data"', { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -151,7 +151,6 @@ async function launchChrome(): Promise<void> {
   })();
 
   if (relayRunning) {
-    // Already running — check CDP
     try {
       const res = await fetch('http://127.0.0.1:9222/json/version');
       if (res.ok) {
@@ -159,7 +158,6 @@ async function launchChrome(): Promise<void> {
         return;
       }
     } catch {}
-    // Stale — kill and relaunch
     console.log('🌐 Chrome stale — restarting...');
     try { execSync('pkill -f "claw-relay/chrome-data"', { stdio: 'ignore' }); } catch {}
     await new Promise(r => setTimeout(r, 2000));
@@ -178,7 +176,6 @@ async function launchChrome(): Promise<void> {
   child.unref();
   chromePid = child.pid;
 
-  // Wait for CDP
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
@@ -200,19 +197,15 @@ async function main() {
     await launchChrome();
   }
 
-  // Import and start server (it reads config from argv)
   process.argv[2] = configPath;
 
-  // Read config for banner info
   const YAML = await import('yaml');
   const config = YAML.parse(fs.readFileSync(configPath, 'utf-8'));
   const serverPort = config.server?.port || port;
   const dashPort = config.dashboard?.port || serverPort + 1;
 
-  // Start the server
   await import('./index');
 
-  // Only show banner when running standalone (not via start.sh)
   if (process.env.CLAW_RELAY_NO_BANNER !== '1') {
     const agentToken = process.env._CLAW_GENERATED_AGENT_TOKEN;
     const adminToken = process.env._CLAW_GENERATED_ADMIN_TOKEN;
@@ -234,7 +227,6 @@ async function main() {
   }
 }
 
-// Cleanup — don't kill Chrome (it's the user's browser)
 process.on('SIGINT', () => { process.exit(0); });
 process.on('SIGTERM', () => { process.exit(0); });
 
