@@ -129,6 +129,27 @@ Set `CLAW_RELAY_URL`, `CLAW_RELAY_TOKEN`, and `CLAW_RELAY_AGENT` in your environ
 - **Rate limiting** — actions are rate-limited per agent
 - **Audit log** — every action is logged with agent ID, action, target, and result
 
+## Troubleshooting
+
+### "Invalid token or agent_id"
+- Agent ID is **case-sensitive**. Check `config.yaml` for exact casing (e.g., `Rusty` ≠ `rusty`)
+- Make sure the token matches exactly — no extra spaces or line breaks
+- The relay must be restarted after editing `config.yaml`
+
+### "Agent lacks scope for 'navigate'"
+- Your agent's `scopes` in `config.yaml` don't include the action you're trying to use
+- Common scopes: `read` (snapshot/screenshot), `navigate`, `interact` (click/fill/type), `execute` (evaluate)
+- Ask the relay admin to update your scopes
+
+### Script errors
+- **"require is not defined"** — the script must be `.cjs`, not `.js` (the repo uses ES modules)
+- **"Cannot find module 'ws'"** — run `npm install` in the `relay-server/` directory first
+
+### Common mistakes
+- ❌ Writing an MCP server or bridge — you don't need one
+- ❌ Keeping a persistent connection — each call is stateless
+- ❌ Wrapping the CLI in another script — just call it directly via `exec`
+
 ## What Makes This Different
 
 Local browser tools require agent and browser on the same machine. Claw Relay doesn't. Your agent runs anywhere and controls the user's real browser remotely — real cookies, real sessions, real logins. No headless browser, no fake profiles.

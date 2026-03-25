@@ -135,6 +135,20 @@ npx claw-relay [options]
 - **Rate limiting** — per agent, per minute
 - **Audit log** — every action logged with timestamp
 
+## First-Time Agent Setup
+
+1. Add your agent to `config.yaml` with a token, scopes, and allowlist
+2. Restart the relay (config is read at startup)
+3. Connect using your platform's method (MCP or OpenClaw skill)
+4. Test with a simple `snapshot` action
+
+**Common gotchas:**
+
+- **Agent ID is case-sensitive** — `Rusty` ≠ `rusty`. Match `config.yaml` exactly.
+- **Restart after config changes** — the relay reads `config.yaml` at startup only
+- **Check scopes** — if an action fails with "permission_denied", the agent needs that scope added
+- **One action per call** (OpenClaw skill) — don't try to batch or keep connections open
+
 ## Docs
 
 | | |
