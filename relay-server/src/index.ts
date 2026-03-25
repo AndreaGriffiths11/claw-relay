@@ -163,6 +163,7 @@ function handleAuth(ws: ServerWebSocket<unknown>, state: ClientState, token: str
   state.authenticated = true;
   state.agentId = agentId;
   state.agentConfig = agentConfig;
+  engine.setRestrictions(agentId, agentConfig.allowlist, config.blocklist || []);
   connectedAgentIds.set(agentId, ws);
   lastPong.set(agentId, Date.now());
   agentConnected(agentId);
@@ -255,6 +256,14 @@ const wsServer = Bun.serve({
   port: config.server.port,
   hostname: config.server.host,
   fetch(req, server) {
+    const origin = req.headers.get('Origin');
+    if (origin) {
+      const url = new URL(origin);
+      const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      if (!isLocal) {
+        return new Response('Forbidden', { status: 403 });
+      }
+    }
     if (server.upgrade(req)) return;
     return new Response('Claw Relay™ WebSocket server', { status: 200 });
   },
