@@ -13,9 +13,11 @@ jobs:
         working-directory: relay-server
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install
-      - run: bunx tsc --noEmit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npx tsc --noEmit
 
   audit:
     runs-on: ubuntu-latest

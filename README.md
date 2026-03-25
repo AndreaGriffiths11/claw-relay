@@ -97,7 +97,13 @@ Optional — lets your agent use your normal Chrome instead of the dedicated win
 
 ## Configuration
 
-Auto-generated `config.yaml` on first run. Key settings:
+Auto-generated `config.yaml` on first run. Or copy the example manually:
+
+```bash
+cp relay-server/config.example.yaml relay-server/config.yaml
+```
+
+Key settings:
 
 ```yaml
 agents:
