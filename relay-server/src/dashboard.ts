@@ -16,6 +16,7 @@ import type { Next } from 'hono/types';
 import { type Config, type AgentConfig, loadConfig } from './auth';
 import type { AgentState } from './state';
 import { tailLines } from './audit-logger';
+import type { WebSocket } from 'ws';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -114,6 +115,7 @@ export function startDashboard(
   getState: GetStateFn,
   configPath: string,
   onConfigChange: () => void,
+  connectedAgentIds: Map<string, WebSocket>,
 ): void {
   let config = initialConfig;
 
@@ -244,6 +246,14 @@ export function startDashboard(
     delete config.agents[id];
     writeConfigAtomic(configPath, config);
     reloadCfg();
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/agents/:id/disconnect', (c) => {
+    const id = c.req.param('id');
+    const ws = connectedAgentIds.get(id);
+    if (!ws) return c.json({ error: 'Agent not connected' }, 404);
+    ws.close(1000, 'Disconnected by admin');
     return c.json({ ok: true });
   });
 

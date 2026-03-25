@@ -48,7 +48,7 @@ interface ClientState {
 }
 
 const clients = new WeakMap<object, ClientState>();
-const connectedAgentIds = new Map<string, WebSocket>();
+export const connectedAgentIds = new Map<string, WebSocket>();
 const lastPong = new Map<string, number>();
 
 // Max failed auth attempts per connection before forced disconnect
@@ -312,4 +312,4 @@ process.on('SIGINT', shutdown);
 
 // --- Dashboard ---
 
-startDashboard(config, getState, configPath, reloadCurrentConfig);
+startDashboard(config, getState, configPath, reloadCurrentConfig, connectedAgentIds);

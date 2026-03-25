@@ -24,5 +24,15 @@ export async function api<T = any>(path: string, opts?: RequestInit): Promise<T>
     window.location.reload();
     throw new Error('Unauthorized');
   }
-  return res.json();
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return res.json();
+  }
+  // Non-JSON response — return empty object to avoid parse errors
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {} as T;
+  }
 }

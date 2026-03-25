@@ -122,6 +122,11 @@ export function AgentsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['config'] }),
   });
 
+  const disconnectMut = useMutation({
+    mutationFn: (id: string) => api(`/api/agents/${encodeURIComponent(id)}/disconnect`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['status'] }),
+  });
+
   const connections = status.data?.connections || [];
   const agents = config.data?.agents || {};
 
@@ -181,6 +186,14 @@ export function AgentsPage() {
               )}
               <div className="actions">
                 <button className="btn btn-sm btn-outline" onClick={() => setEditing(id)}>Edit</button>
+                {conn && (
+                  <button
+                    className="btn btn-sm btn-red"
+                    onClick={() => { if (confirm(`Disconnect agent ${id}?`)) disconnectMut.mutate(id); }}
+                  >
+                    ⛔ Disconnect
+                  </button>
+                )}
                 <button
                   className="btn btn-sm btn-red"
                   onClick={() => { if (confirm(`Delete agent ${id}?`)) deleteMut.mutate(id); }}
