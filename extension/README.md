@@ -4,7 +4,7 @@ Status dashboard for your browser toolbar. Shows connection status, recent agent
 
 > **Chrome Web Store submission is pending review.** In the meantime, you can install manually (see below).
 
-The extension is primarily designed for [Claw Relay Cloud](https://clawrelay.dev) users — it connects to your cloud relay and shows agent activity in real time. It also works with self-hosted relays.
+The extension connects to your local relay server and bridges your existing Chrome tabs to your AI agent.
 
 Works with **Chrome**, **Microsoft Edge**, and any Chromium-based browser.
 
@@ -61,3 +61,5 @@ git clone https://github.com/AndreaGriffiths11/claw-relay.git
 | Badge disappears | The service worker may have gone idle. Click the extension icon to wake it up. |
 | Changes not reflecting | Hit the refresh icon on `chrome://extensions` after pulling updates. |
 | Permission errors | Make sure the host permissions in `manifest.json` match your relay server URL. |
+ifest.json` match your relay server URL. |
+permissions in `manifest.json` match your relay server URL. |
