@@ -56,7 +56,7 @@ if (!fs.existsSync(configPath)) {
   const config = `# Claw Relay — auto-generated config
 server:
   port: ${port}
-  host: "0.0.0.0"
+  host: "127.0.0.1"  # change to "0.0.0.0" to allow remote connections
 
 agents:
   default:
@@ -84,9 +84,9 @@ dashboard:
   fs.writeFileSync(configPath, config, 'utf-8');
   console.log(`📝 Generated config at ${configPath}`);
 
-  // Store tokens for banner
-  (globalThis as any).__generatedAgentToken = agentToken;
-  (globalThis as any).__generatedAdminToken = adminToken;
+  // Pass tokens to banner via env (avoids polluting globalThis)
+  process.env._CLAW_GENERATED_AGENT_TOKEN = agentToken;
+  process.env._CLAW_GENERATED_ADMIN_TOKEN = adminToken;
 }
 
 // --- Chrome launch ---
@@ -214,8 +214,8 @@ async function main() {
 
   // Only show banner when running standalone (not via start.sh)
   if (process.env.CLAW_RELAY_NO_BANNER !== '1') {
-    const agentToken = (globalThis as any).__generatedAgentToken;
-    const adminToken = (globalThis as any).__generatedAdminToken;
+    const agentToken = process.env._CLAW_GENERATED_AGENT_TOKEN;
+    const adminToken = process.env._CLAW_GENERATED_ADMIN_TOKEN;
 
     console.log('');
     console.log('🦞 ═══════════════════════════════════════════');

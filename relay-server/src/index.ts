@@ -62,6 +62,15 @@ const STALE_THRESHOLD_MS = 90_000;
 // oversized payloads while allowing large snapshots through
 const MAX_MESSAGE_SIZE = 1024 * 1024;
 
+// Unauthenticated connections must complete auth within this window.
+// Prevents resource exhaustion from connections that open but never authenticate.
+const AUTH_TIMEOUT_MS = 30_000;
+
+// Max total concurrent WebSocket connections (authenticated + unauthenticated).
+// Prevents resource exhaustion from connection floods.
+const MAX_CONNECTIONS = 100;
+let activeConnections = 0;
+
 const heartbeatInterval = setInterval(() => {
   const now = Date.now();
   for (const [agentId, ws] of connectedAgentIds) {
@@ -253,13 +262,29 @@ const wsServer = Bun.serve({
     // #8: Cap incoming WebSocket frame size
     maxPayloadLength: MAX_MESSAGE_SIZE,
     open(ws) {
+      // Connection limit — reject if at capacity
+      if (activeConnections >= MAX_CONNECTIONS) {
+        ws.close(1013, 'Server at capacity');
+        return;
+      }
+      activeConnections++;
       clients.set(ws, { authenticated: false, authAttempts: 0 });
+
+      // Auth timeout — close if not authenticated within 30s
+      setTimeout(() => {
+        const state = clients.get(ws);
+        if (state && !state.authenticated) {
+          send(ws, { type: 'error', code: 'auth_timeout', message: 'Authentication timeout' });
+          ws.close(4008, 'Auth timeout');
+        }
+      }, AUTH_TIMEOUT_MS);
     },
     message(ws, message) {
       const decoded = typeof message === 'string' ? message : new TextDecoder().decode(message);
       handleMessage(ws, decoded);
     },
     close(ws) {
+      activeConnections--;
       const state = clients.get(ws);
       if (state?.agentId) {
         connectedAgentIds.delete(state.agentId);
