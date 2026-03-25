@@ -115,18 +115,20 @@ function run() {
       return;
     }
 
-    // Auth response
-    if (msg.type === 'auth_success' || msg.type === 'welcome') {
+    // Auth response — relay sends { type: 'result', action: 'auth', ok: true }
+    if (msg.type === 'auth_success' || msg.type === 'welcome' ||
+        (msg.type === 'result' && msg.action === 'auth' && msg.ok)) {
       ws.send(JSON.stringify(actionMsg));
       return;
     }
 
-    if (msg.type === 'auth_error' || msg.type === 'error') {
+    if (msg.type === 'auth_error' || msg.type === 'error' ||
+        (msg.type === 'result' && msg.action === 'auth' && !msg.ok)) {
       finish({ error: msg.message || msg.error || 'Auth failed' });
       return;
     }
 
-    // Action response
+    // Action response (non-auth results)
     if (msg.type === 'result' || msg.type === 'action_result' || msg.type === 'response') {
       finish(msg);
       return;
