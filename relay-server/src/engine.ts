@@ -29,6 +29,16 @@ export class Engine {
   private pageIds = new Map<Page, string>();
   private nextPageId = 1;
 
+  // Ref map: sequential refs (e0, e1, ...) → backendDOMNodeId
+  private refCounter = 0;
+  private refMap = new Map<string, number>();
+
+  private static readonly REF_ROLES = new Set([
+    'textbox', 'button', 'link', 'checkbox', 'radio', 'combobox',
+    'menuitem', 'tab', 'switch', 'slider', 'searchbox', 'option',
+    'listbox', 'menu', 'tree', 'treeitem', 'heading',
+  ]);
+
   constructor(timeout: number, cdpUrl = 'http://127.0.0.1:9222') {
     this.timeout = timeout;
     this.cdpUrl = cdpUrl;
@@ -362,13 +372,40 @@ export class Engine {
     const cdp = await page.context().newCDPSession(page);
     try {
       const { nodes } = await cdp.send('Accessibility.getFullAXTree') as { nodes: any[] };
-      return this.formatAXTreeFlat(nodes);
+      const tree = this.formatAXTreeFlat(nodes);
+
+      // Clean up old data-claw-ref attributes
+      await cdp.send('Runtime.evaluate', {
+        expression: 'document.querySelectorAll("[data-claw-ref]").forEach(el => el.removeAttribute("data-claw-ref"))',
+      });
+
+      // Inject data-claw-ref attributes for each mapped ref
+      for (const [ref, backendNodeId] of this.refMap.entries()) {
+        try {
+          const { object } = await cdp.send('DOM.resolveNode', { backendNodeId });
+          if (object?.objectId) {
+            await cdp.send('Runtime.callFunctionOn', {
+              objectId: object.objectId,
+              functionDeclaration: `function() { this.setAttribute('data-claw-ref', '${ref}'); }`,
+              arguments: [],
+            });
+          }
+        } catch {
+          // Node may not be in DOM (e.g. virtual/offscreen)
+        }
+      }
+
+      return tree;
     } finally {
       await cdp.detach();
     }
   }
 
   private formatAXTreeFlat(nodes: any[]): string {
+    // Reset ref map for each snapshot
+    this.refCounter = 0;
+    this.refMap.clear();
+
     const lines: string[] = [];
     for (const node of nodes) {
       const name = node.name?.value || '';
@@ -377,8 +414,18 @@ export class Engine {
       if (role === 'none' || role === 'generic') continue;
       if (!name && !value && role === 'StaticText') continue;
 
-      const id = node.nodeId || '';
-      let line = `[${id}] ${role}`;
+      // Assign sequential ref for interactive roles with a backendDOMNodeId
+      const backendId: number | undefined = node.backendDOMNodeId;
+      let label: string;
+      if (backendId !== undefined && Engine.REF_ROLES.has(role)) {
+        const ref = `e${this.refCounter++}`;
+        this.refMap.set(ref, backendId);
+        label = ref;
+      } else {
+        label = node.nodeId || '';
+      }
+
+      let line = `[${label}] ${role}`;
       if (name) line += ` "${name}"`;
       if (value) line += ` value="${value}"`;
 
@@ -395,6 +442,13 @@ export class Engine {
   }
 
   private async findByRef(page: Page, ref: string): Promise<ElementHandle> {
+    // Check ref map first (e.g. "e5")
+    if (/^e\d+$/.test(ref)) {
+      const el = await page.$(`[data-claw-ref="${ref}"]`);
+      if (el) return el;
+      throw new Error(`Ref ${ref} not found — snapshot may be stale. Take a new snapshot.`);
+    }
+
     const escaped = ref.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
     let el = await page.$(`[aria-label="${escaped}"]`)
