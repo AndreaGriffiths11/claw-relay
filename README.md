@@ -33,9 +33,9 @@ Use the MCP server for Claude Desktop, Copilot CLI, or any MCP client:
       "command": "node",
       "args": ["mcp/claw-relay-mcp.js"],
       "env": {
-        "RELAY_URL": "ws://localhost:9333",
-        "RELAY_TOKEN": "your-token",
-        "RELAY_AGENT_ID": "default"
+        "CLAW_RELAY_URL": "ws://localhost:9333",
+        "CLAW_RELAY_TOKEN": "your-token",
+        "CLAW_RELAY_AGENT": "default"
       }
     }
   }

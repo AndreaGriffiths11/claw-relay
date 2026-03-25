@@ -43,7 +43,7 @@ After auth succeeds, send actions as JSON:
 | `select` | `interact` | `{"type": "select", "ref": "e7", "values": ["opt1"]}` |
 | `navigate` | `navigate` | `{"type": "navigate", "url": "https://..."}` |
 | `evaluate` | `execute` | `{"type": "evaluate", "js": "document.title"}` |
-| `close` | `navigate` | `{"type": "close"}` |
+| `close` | `navigate` | `{"type": "close"}` — closes current tab |
 
 ## Responses
 
@@ -91,11 +91,10 @@ Local browser tools require agent and browser on the same machine. Claw Relay do
 Users set up the relay on their machine:
 
 ```bash
-git clone https://github.com/AndreaGriffiths11/claw-relay.git
-cd claw-relay && ./start.sh
+bunx claw-relay
 ```
 
-Or use Claw Relay Cloud at [clawrelay.dev](https://clawrelay.dev) — no tunnels, no config.
+This launches Chrome, generates config with random tokens, and starts the relay. One command, zero setup.
 
 ## Common Tasks
 
@@ -124,7 +123,6 @@ Or use Claw Relay Cloud at [clawrelay.dev](https://clawrelay.dev) — no tunnels
 ## Error Handling
 
 - `permission_denied` — you lack the required scope. Ask the user to upgrade your agent config.
-- `site_blocked` — the target site is on the global blocklist. Cannot be overridden.
-- `site_not_allowed` — the site isn't in your allowlist. Ask the user to add it.
+- `site_blocked` — the site is on the global blocklist (cannot be overridden) or not in your allowlist. Ask the user to check the config.
 - `rate_limited` — slow down. Wait and retry.
 - `engine_error` — browser or CDP issue. The page may have navigated or the element may be stale. Re-snapshot and retry.
