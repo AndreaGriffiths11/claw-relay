@@ -1,6 +1,6 @@
 # MCP Server
 
-The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (GitHub Copilot CLI, Claude Desktop, etc.) to Claw Relay.
+The `mcp/` directory contains a stdio-based MCP server that bridges any MCP-compatible client (Copilot CLI, Claude Code, etc.) to Claw Relay.
 
 ## Setup
 

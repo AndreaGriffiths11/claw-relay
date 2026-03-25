@@ -12,11 +12,11 @@ Thanks for wanting to contribute! Here's how to get started.
    ```
 4. Install dependencies:
    ```bash
-   cd relay-server && bun install
+   cd relay-server && npm install
    ```
 5. Test locally — start the relay, verify your changes work:
    ```bash
-   cd relay-server && bun src/cli.ts
+   cd relay-server && npx tsx src/cli.ts
    ```
 6. Open a PR against `main`
 
@@ -30,25 +30,25 @@ Thanks for wanting to contribute! Here's how to get started.
 ## PR Guidelines
 
 - Keep PRs focused — one feature or fix per PR
-- Make sure it type-checks (`bunx tsc --noEmit`)
-- Verify the relay starts cleanly (`bun src/cli.ts`)
+- Make sure it type-checks (`npx tsc --noEmit`)
+- Verify the relay starts cleanly (`npx tsx src/cli.ts`)
 - Describe what changed and why
 - Include steps to test if it's not obvious
 
 ## Code Style
 
-- **TypeScript** — strict mode, Bun runtime
+- **TypeScript** — strict mode, Node.js runtime
 - Zero new dependencies unless absolutely necessary (and discussed first)
 - Dashboard is a TanStack React SPA in `relay-server/dashboard/`
 
 ## Architecture
 
 ```
-relay-server/           # Bun/TypeScript
+relay-server/           # Node.js/TypeScript
 ├── src/
-│   ├── cli.ts          # CLI entry point (bunx claw-relay)
+│   ├── cli.ts          # CLI entry point (npx claw-relay)
 │   ├── index.ts        # WebSocket server, relay logic
-│   ├── engine.ts       # Chrome integration via puppeteer-core (CDP)
+│   ├── engine.ts       # Chrome integration via playwright-core (CDP)
 │   ├── dashboard.ts    # HTTP dashboard server
 │   ├── state.ts        # Connection state tracking
 │   ├── auth.ts         # Config loading, authentication
@@ -61,7 +61,7 @@ relay-server/           # Bun/TypeScript
 ├── config.example.yaml
 └── package.json
 
-mcp/                    # MCP server for Claude Desktop, Copilot CLI, etc.
+mcp/                    # MCP server for Copilot CLI, Claude Code, etc.
 └── claw-relay-mcp.js
 
 extension/              # Chrome Extension (Manifest V3)
