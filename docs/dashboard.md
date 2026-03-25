@@ -16,8 +16,8 @@ Enter your admin token in the auth modal when prompted.
 
 ```bash
 cd relay-server/dashboard
-bun install
-bun run build
+npm install
+npm run build
 ```
 
 `start.sh` builds automatically if `dashboard/dist/` doesn't exist.

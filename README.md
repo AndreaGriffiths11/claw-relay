@@ -9,14 +9,16 @@ Give your AI agents a real browser.
 ## Quick Start
 
 ```bash
-bunx claw-relay
+npx claw-relay
 ```
+
+> **Note:** Not yet published to npm. For now, clone the repo and run `./start.sh`.
 
 Launches a dedicated Chrome window, starts the relay, generates config with random tokens. One command, zero setup.
 
 **First time:** Sign into GitHub (or any site) in the Claw Relay Chrome window. Logins persist between restarts.
 
-**Restart:** `Ctrl+C` stops the relay. Chrome stays open. Run `bunx claw-relay` again — it reconnects without relaunching Chrome.
+**Restart:** `Ctrl+C` stops the relay. Chrome stays open. Run `npx claw-relay` again — it reconnects without relaunching Chrome.
 
 ## What It Does
 
@@ -83,7 +85,7 @@ blocklist:
 ## CLI Options
 
 ```
-bunx claw-relay [options]
+npx claw-relay [options]
 
   --port <number>    Server port (default: 9333)
   --config <path>    Custom config path
@@ -111,9 +113,9 @@ bunx claw-relay [options]
 
 ## Built With
 
-- [Bun](https://bun.sh) — runtime
+- [Node.js](https://nodejs.org) — runtime
 - [Hono](https://hono.dev) — HTTP framework
-- [Puppeteer](https://pptr.dev) — Chrome CDP integration
+- [Playwright](https://playwright.dev) — browser automation
 - [Railway](https://railway.com?referralCode=a2vuTz) — cloud hosting
 - [Cloudflare Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — secure remote access
 - [TanStack Router](https://tanstack.com/router) — dashboard SPA
