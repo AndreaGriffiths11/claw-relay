@@ -89,13 +89,14 @@ export class Engine {
       }
 
       case 'close': {
-        const pages = (await this.getBrowser()).pages();
-        const p = (await pages)[((await pages).length - 1)];
-        if ((await (await this.getBrowser()).pages()).length > 1) {
-          await p.close();
+        const browser = await this.getBrowser();
+        const allPages = await browser.pages();
+        const activePage = allPages[allPages.length - 1];
+        if (allPages.length > 1) {
+          await activePage.close();
           return 'Tab closed';
         }
-        await p.goto('about:blank');
+        await activePage.goto('about:blank');
         return 'Navigated to blank';
       }
 
@@ -153,14 +154,17 @@ export class Engine {
     }
   }
 
-  // Find element by aria ref (accessibility node ID or aria label)
+  // Find element by ref from the accessibility snapshot.
+  // Refs are accessibility node IDs or aria labels — escape them
+  // before interpolating into CSS attribute selectors to prevent injection.
   private async findByRef(page: Page, ref: string) {
-    // Try aria label selector first
-    const el = await page.$(`[aria-label="${ref}"]`)
-      || await page.$(`[name="${ref}"]`)
-      || await page.$(`[id="${ref}"]`)
-      || await page.$(`[placeholder="${ref}"]`)
-      || await page.$(`::-p-text(${ref})`);
+    const escaped = ref.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+    const el = await page.$(`[aria-label="${escaped}"]`)
+      || await page.$(`[name="${escaped}"]`)
+      || await page.$(`[id="${escaped}"]`)
+      || await page.$(`[placeholder="${escaped}"]`)
+      || await page.$(`::-p-text(${escaped})`);
 
     if (!el) throw new Error(`Element not found: ${ref}`);
     return el;
