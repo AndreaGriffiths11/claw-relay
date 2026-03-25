@@ -39,7 +39,9 @@ Claw Relay sits between your AI agent and Chrome. The agent sends actions (navig
 
 ## Connect Your Agent
 
-Use the MCP server for Claude Desktop, Copilot CLI, or any MCP client:
+Works with **Copilot CLI**, **OpenClaw**, **Claude Code**, **nanobot**, **ZeroClaw**, or any MCP client.
+
+### MCP (Copilot CLI, Claude Code, any MCP client)
 
 ```json
 {
@@ -57,7 +59,18 @@ Use the MCP server for Claude Desktop, Copilot CLI, or any MCP client:
 }
 ```
 
-See [MCP docs](docs/mcp.md) for details.
+### WebSocket (OpenClaw, nanobot, ZeroClaw, custom agents)
+
+Connect directly via WebSocket — no MCP required:
+
+```javascript
+const ws = new WebSocket('ws://localhost:9333');
+ws.send(JSON.stringify({ type: 'auth', token: 'your-token', agent_id: 'your-agent' }));
+```
+
+See [protocol docs](docs/protocol.md) for the full action reference.
+
+See [MCP docs](docs/mcp.md) for MCP-specific setup.
 
 ## Chrome Extension
 
