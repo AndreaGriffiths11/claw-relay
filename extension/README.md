@@ -59,7 +59,29 @@ Matches the engine.ts ref system:
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked** → select this `extension/` folder
-4. Configure relay URL and token in the extension's Settings page
+4. Click the extension icon → **⚙ Settings**
+5. Set your **Relay URL** (default: `ws://localhost:9333`)
+6. Set your **Token** — find it in `relay-server/config.yaml` under your agent's `token` field
+7. Set your **Agent ID** — matches the agent name in `config.yaml`
+
+### Where's the token?
+
+The relay auto-generates `config.yaml` on first run. Open it:
+
+```bash
+cat relay-server/config.yaml
+```
+
+Look for:
+
+```yaml
+agents:
+  - id: my-agent
+    token: crly_abc123...   # ← paste this into the extension
+    scopes: [read, interact, navigate]
+```
+
+Copy the `token` value into the extension settings. The `id` goes into the Agent ID field.
 
 ## Architecture Note
 
