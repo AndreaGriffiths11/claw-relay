@@ -215,9 +215,9 @@ async function handleAction(ws: ServerWebSocket<unknown>, state: ClientState, ms
 
   // Screenshots come as base64 directly from the engine
   if (msg.type === 'screenshot' && result.data) {
-    send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, mimeType: 'image/png', request_id: reqId });
+    send(ws, { type: 'result', action: 'screenshot', ok: true, data: result.data, mimeType: msg.imageType === 'jpeg' ? 'image/jpeg' : 'image/png', request_id: reqId, targetId: result.targetId });
   } else {
-    send(ws, { type: 'result', action: msg.type, ok: true, data: result.data, request_id: reqId });
+    send(ws, { type: 'result', action: msg.type, ok: true, data: result.data, request_id: reqId, targetId: result.targetId });
   }
 }
 
