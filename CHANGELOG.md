@@ -1,4 +1,7 @@
 # Changelog
+## Unreleased
+- chore: update npm package name to @acolombiadev/claw-relay ([#58](https://github.com/AndreaGriffiths11/claw-relay/pull/58)) — 2026-03-26
+
 
 ## v1.0.0 — The Open-Source Release
 
