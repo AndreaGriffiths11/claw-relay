@@ -293,7 +293,7 @@ const server = createServer((req, res) => {
   }
 });
 
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_SIZE });
 
 server.on('upgrade', (req, socket, head) => {
   if (activeConnections >= MAX_CONNECTIONS) {
