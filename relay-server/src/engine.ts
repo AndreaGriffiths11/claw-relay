@@ -329,18 +329,10 @@ export class Engine {
       }
 
       case 'batch': {
-        const results: Array<{ ok: boolean; error?: string }> = [];
-        for (const action of (msg.actions || [])) {
-          try {
-            await this.runAction(action, page);
-            results.push({ ok: true });
-          } catch (e: unknown) {
-            const err = e instanceof Error ? e.message : String(e);
-            results.push({ ok: false, error: err });
-            if (msg.stopOnError) break;
-          }
-        }
-        return JSON.stringify({ results });
+        // Security: batch is handled at the protocol layer (index.ts)
+        // to ensure each sub-action passes permission/rate-limit/blocklist checks.
+        // If called directly, reject.
+        throw new Error('batch must be handled at the protocol layer, not engine');
       }
 
       case 'console': {
