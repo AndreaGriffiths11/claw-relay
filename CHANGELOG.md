@@ -122,7 +122,7 @@ These happened roughly in order. Each one was prompted by either an audit or a "
 3. **Timing-safe admin auth** — constant-time comparison to prevent timing attacks
 4. **Config file permissions** — `0600` on config.yaml (contains tokens)
 5. **SSRF redirect protection** — block redirect chains that escape URL allowlists
-6. **Path traversal protection** — sanitize file paths in screenshot/download actions
+6. **Path traversal protection** — dashboard static file serving (`/assets/*`). The original screenshot path traversal was eliminated entirely by the CDP migration (base64 in memory, no file paths).
 7. **Batch scope bypass fix** — enforce per-action scope checks inside batch requests
 8. **wait+fn execute scope enforcement** — `fn` parameter in `wait` requires `execute` scope
 9. **Hardcoded blocklist** (banking/email URLs) — added, then later reverted to user-controlled allowlists. Opinionated defaults belong in docs, not code.
