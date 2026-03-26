@@ -91,7 +91,7 @@ Local browser tools require agent and browser on the same machine. Claw Relay do
 Users set up the relay on their machine:
 
 ```bash
-npx claw-relay
+npx @acolombiadev/claw-relay
 ```
 
 This launches Chrome, generates config with random tokens, and starts the relay. One command, zero setup.

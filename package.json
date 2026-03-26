@@ -1,5 +1,5 @@
 {
-  "name": "claw-relay",
+  "name": "@acolombiadev/claw-relay",
   "version": "0.1.0",
   "type": "module",
   "description": "Give your AI agents a real browser. Secure relay between AI agents and Chrome.",

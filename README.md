@@ -9,7 +9,7 @@ Give your AI agents a real browser.
 ## Quick Start
 
 ```bash
-npx claw-relay
+npx @acolombiadev/claw-relay
 ```
 
 > **Note:** Not yet published to npm. For now, clone the repo and run `./start.sh`.
@@ -18,7 +18,7 @@ Launches a dedicated Chrome window, starts the relay, generates config with rand
 
 **First time:** Sign into GitHub (or any site) in the Claw Relay Chrome window. Logins persist between restarts.
 
-**Restart:** `Ctrl+C` stops the relay. Chrome stays open. Run `npx claw-relay` again — it reconnects without relaunching Chrome.
+**Restart:** `Ctrl+C` stops the relay. Chrome stays open. Run `npx @acolombiadev/claw-relay` again — it reconnects without relaunching Chrome.
 
 ## What It Does
 
@@ -120,7 +120,7 @@ blocklist:
 ## CLI Options
 
 ```
-npx claw-relay [options]
+npx @acolombiadev/claw-relay [options]
 
   --port <number>    Server port (default: 9333)
   --config <path>    Custom config path
