@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { api } from '../api';
 
 function formatUptime(started: string) {
@@ -11,6 +12,7 @@ function formatUptime(started: string) {
 }
 
 export function OverviewPage() {
+  const navigate = useNavigate();
   const status = useQuery({
     queryKey: ['status'],
     queryFn: () => api('/api/status'),
@@ -53,7 +55,7 @@ export function OverviewPage() {
         {Object.entries(config.data?.agents || {}).map(([id, agent]: [string, any]) => {
           const conn = connections.find((c: any) => c.agentId === id);
           return (
-            <div className="card" key={id}>
+            <div className="card agent-card-link" key={id} onClick={() => navigate({ to: '/agents' })} style={{ cursor: 'pointer' }}>
               <div className="agent-id">{id}</div>
               <div className="status">{conn ? '🟢 Connected' : '⚪ Offline'}</div>
               <div className="pills">
