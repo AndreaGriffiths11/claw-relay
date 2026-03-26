@@ -391,4 +391,4 @@ process.on('SIGINT', shutdown);
 
 // --- Dashboard ---
 
-startDashboard(config, getState, configPath, reloadCurrentConfig, connectedAgentIds);
+startDashboard(config, getState, configPath, reloadCurrentConfig, connectedAgentIds, audit);

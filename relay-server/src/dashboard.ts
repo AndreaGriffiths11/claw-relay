@@ -8,6 +8,7 @@ import { serve } from '@hono/node-server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { dirname } from 'path';
+import { AuditLogger } from './audit-logger';
 import { fileURLToPath } from 'url';
 import * as crypto from 'crypto';
 import * as YAML from 'yaml';
@@ -116,6 +117,7 @@ export function startDashboard(
   configPath: string,
   onConfigChange: () => void,
   connectedAgentIds: Map<string, WebSocket>,
+  auditLogger?: AuditLogger,
 ): void {
   let config = initialConfig;
 
@@ -176,9 +178,13 @@ export function startDashboard(
   });
 
   app.delete('/api/audit', (c) => {
-    const logFile = config.audit.logFile;
-    const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
-    try { fs.writeFileSync(absPath, '', 'utf-8'); } catch {}
+    if (auditLogger) {
+      auditLogger.clear();
+    } else {
+      const logFile = config.audit.logFile;
+      const absPath = path.isAbsolute(logFile) ? logFile : path.join(process.cwd(), logFile);
+      try { fs.writeFileSync(absPath, '', 'utf-8'); } catch {}
+    }
     return c.json({ ok: true });
   });
 

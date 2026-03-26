@@ -4,10 +4,12 @@ import * as fs from 'fs';
 // with timestamp, agent, action, and outcome. Designed for grep/jq analysis.
 
 export class AuditLogger {
-  private readonly stream: fs.WriteStream;
+  private stream: fs.WriteStream;
+  private readonly logFile: string;
   private readonly logToStdout: boolean;
 
   constructor(logFile: string, logToStdout: boolean = true) {
+    this.logFile = logFile;
     this.stream = fs.createWriteStream(logFile, { flags: 'a' });
     this.logToStdout = logToStdout;
   }
@@ -24,6 +26,13 @@ export class AuditLogger {
     const line = JSON.stringify(record);
     this.stream.write(line + '\n');
     if (this.logToStdout) console.log(line);
+  }
+
+  /** Truncate the log file and reopen the write stream at position 0. */
+  clear(): void {
+    this.stream.end();
+    fs.writeFileSync(this.logFile, '', 'utf-8');
+    this.stream = fs.createWriteStream(this.logFile, { flags: 'a' });
   }
 }
 
