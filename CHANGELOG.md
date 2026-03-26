@@ -14,8 +14,6 @@ Claw Relay started as a Chrome extension paired with a relay server: a way for A
 
 The short version: we tried to make it fast with Rust, learned the bottleneck was Chrome itself (not the server), simplified back to Node.js, fought Bun's WebSocket bugs, switched to Playwright, and spent the last stretch hardening security after finding two critical scope bypasses.
 
-199 commits. 38 merged PRs. 5 security audit rounds. Here's how it happened.
-
 ---
 
 ## Phase 1: MVP
@@ -94,6 +92,8 @@ The "make it actually safe to ship" phase.
 - **Two critical scope bypasses fixed:**
   - **Batch bypass** — agents could bundle disallowed actions inside a batch request, circumventing per-action scope checks
   - **wait+fn bypass** — the `wait` action with a `fn` parameter could execute arbitrary JavaScript, ignoring the `execute` scope restriction
+- **Dashboard path traversal fix** — sanitize `/assets/*` static file serving to prevent directory escape
+- **maxPayload transport-level enforcement** — cap WebSocket message size to prevent memory exhaustion
 - **Docs release audit** — every stale reference, dead link, and outdated example cleaned before open-source launch
 - **Copilot CLI quickstart** — streamlined onboarding for the most common use case
 
