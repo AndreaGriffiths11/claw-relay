@@ -1,0 +1,46 @@
+version: 2
+updates:
+  # Relay server dependencies
+  - package-ecosystem: npm
+    directory: /relay-server
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+
+  # Dashboard dependencies
+  - package-ecosystem: npm
+    directory: /relay-server/dashboard
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+
+  # MCP server dependencies
+  - package-ecosystem: npm
+    directory: /mcp
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+
+  # Root package (published to npm)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+
+  # GitHub Actions — keep pinned SHAs up to date
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - ci
