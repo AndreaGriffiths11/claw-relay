@@ -12,8 +12,6 @@ Give your AI agents a real browser.
 npx @acolombiadev/claw-relay
 ```
 
-> **Note:** Not yet published to npm. For now, clone the repo and run `./start.sh`.
-
 Launches a dedicated Chrome window, starts the relay, generates config with random tokens. One command, zero setup.
 
 **First time:** Sign into GitHub (or any site) in the Claw Relay Chrome window. Logins persist between restarts.
