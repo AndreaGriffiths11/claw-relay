@@ -9,6 +9,7 @@ export function AuditPage() {
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ok' | 'fail'>('all');
   const [page, setPage] = useState(0);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const audit = useQuery({
     queryKey: ['audit'],
@@ -58,10 +59,18 @@ export function AuditPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-outline" onClick={download}>⬇ Download</button>
           <button
-            className="btn btn-red"
-            onClick={() => { if (confirm('Clear all audit log entries? This cannot be undone.')) clearMut.mutate(); }}
+            className={confirmClear ? 'btn btn-red btn-confirm' : 'btn btn-red'}
+            onClick={() => {
+              if (confirmClear) {
+                clearMut.mutate();
+                setConfirmClear(false);
+              } else {
+                setConfirmClear(true);
+                setTimeout(() => setConfirmClear(false), 3000);
+              }
+            }}
           >
-            🗑 Clear
+            {confirmClear ? '⚠ Confirm Clear?' : '🗑 Clear'}
           </button>
         </div>
       </div>
