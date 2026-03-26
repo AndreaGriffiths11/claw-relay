@@ -26,6 +26,28 @@ let config = loadConfig(configPath);
 
 export function reloadCurrentConfig(): void {
   config = loadConfig(configPath);
+
+  // Hot-reload: re-apply scopes, allowlist, and rate limits for connected agents
+  for (const [agentId, ws] of connectedAgentIds) {
+    const agentCfg = config.agents[agentId];
+    if (!agentCfg) {
+      // Agent was removed from config — disconnect them
+      console.log(`Agent ${agentId} removed from config, disconnecting`);
+      ws.close(4010, 'Agent removed from config');
+      continue;
+    }
+
+    // Update the cached agentConfig on the client state
+    // WeakMap is keyed by ws object, so we need to walk connections
+    const state = clients.get(ws);
+    if (state) {
+      state.agentConfig = agentCfg;
+    }
+
+    // Re-apply engine restrictions (allowlist + blocklist)
+    engine.setRestrictions(agentId, agentCfg.allowlist, config.blocklist || []);
+    console.log(`Agent ${agentId} config hot-reloaded`);
+  }
 }
 
 export function getConfigPath(): string {
