@@ -23,9 +23,11 @@ const SCOPE_MAP: Record<string, string> = {
   batch: 'interact',
 };
 
-export function hasPermission(scopes: readonly string[], action: string): boolean {
-  const required = SCOPE_MAP[action];
+export function hasPermission(scopes: readonly string[], action: string, msg?: { fn?: string }): boolean {
+  let required = SCOPE_MAP[action];
   // Unknown actions are denied — fail closed
   if (!required) return false;
+  // wait + fn runs arbitrary JS — require execute scope
+  if (action === 'wait' && msg?.fn) required = 'execute';
   return scopes.includes(required);
 }

@@ -174,7 +174,7 @@ async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessag
 
     for (const action of (msg.actions || [])) {
       // Check permission for each sub-action
-      if (!hasPermission(agentCfg.scopes, action.type)) {
+      if (!hasPermission(agentCfg.scopes, action.type, action)) {
         results.push({ ok: false, action: action.type, error: `Agent lacks scope for '${action.type}'` });
         audit.log({ agent_id: agentId, action: action.type, ok: false, duration_ms: 0, error: 'permission_denied' });
         if (msg.stopOnError) break;
@@ -218,7 +218,7 @@ async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessag
     return;
   }
 
-  if (!hasPermission(agentCfg.scopes, msg.type)) {
+  if (!hasPermission(agentCfg.scopes, msg.type, msg)) {
     send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks scope for '${msg.type}'`, request_id: reqId });
     audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
     return;
