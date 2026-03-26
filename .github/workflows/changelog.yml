@@ -1,0 +1,44 @@
+name: Update Changelog
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  changelog:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Append to CHANGELOG.md
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_URL="${{ github.event.pull_request.html_url }}"
+          DATE=$(date -u +%Y-%m-%d)
+
+          # Add entry after the first ## heading (latest version section)
+          # Format: - PR title (#number) — YYYY-MM-DD
+          ENTRY="- ${PR_TITLE} ([#${PR_NUMBER}](${PR_URL})) — ${DATE}"
+
+          # Find the first blank line after "## " and insert there
+          if grep -q "^## Unreleased" CHANGELOG.md; then
+            sed -i "/^## Unreleased/a\\${ENTRY}" CHANGELOG.md
+          else
+            # Add Unreleased section at top if missing
+            sed -i "1a\\## Unreleased\n${ENTRY}\n" CHANGELOG.md
+          fi
+
+      - name: Commit changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet || git commit -m "changelog: add PR #${{ github.event.pull_request.number }}"
+          git push

@@ -1,0 +1,57 @@
+{
+  "name": "claw-relay",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Give your AI agents a real browser. Secure relay between AI agents and Chrome.",
+  "main": "relay-server/dist/index.js",
+  "bin": {
+    "claw-relay": "relay-server/dist/cli.js"
+  },
+  "files": [
+    "relay-server/dist/",
+    "relay-server/dashboard/dist/",
+    "relay-server/package.json",
+    "relay-server/config.example.yaml",
+    "mcp/",
+    "extension/",
+    "docs/",
+    "start.sh",
+    "LICENSE",
+    "README.md",
+    "SKILL.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "cd relay-server && node dist/index.js",
+    "build": "cd relay-server && npx tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndreaGriffiths11/claw-relay.git"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "browser",
+    "relay",
+    "chrome",
+    "copilot",
+    "automation",
+    "mcp",
+    "cdp",
+    "playwright",
+    "browser-automation"
+  ],
+  "author": "Andrea Griffiths",
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "hono": "^4.12.8",
+    "playwright-core": "^1.58.0",
+    "ws": "^8.20.0",
+    "yaml": "^2.3.4"
+  }
+}

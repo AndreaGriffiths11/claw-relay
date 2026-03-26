@@ -1,0 +1,10 @@
+*.js.map
+*.zip
+.DS_Store
+/tmp/
+audit.jsonl
+claw-relay-extension.zip
+config.yaml
+dist/
+node_modules/
+relay-core/target/

@@ -1,0 +1,34 @@
+server:
+  port: 9333  # Don't use 9222 — that's Chrome's CDP port
+  host: "127.0.0.1"  # change to "0.0.0.0" to allow remote connections
+
+agents:
+  deploy-bot:
+    # Generate a token with: npx claw-relay (auto-generates on first run)
+    # Or create one manually: node -e "console.log('crly_' + require('crypto').randomBytes(24).toString('hex'))"
+    token: "crly_CHANGE_ME_generate_a_secure_token"
+    scopes: ["read", "interact", "navigate"]
+    allowlist: ["dash.cloudflare.com", "github.com"]
+    rateLimit: 30
+
+  research-bot:
+    token: "crly_CHANGE_ME_generate_a_secure_token"
+    scopes: ["read"]
+    allowlist: ["*"]
+    rateLimit: 60
+
+blocklist:
+  - "*.bank.com"
+  - "mail.google.com"
+  - "accounts.google.com"
+
+audit:
+  logFile: "./audit.jsonl"
+  logToStdout: true
+
+engine:
+  timeout: 30000
+
+dashboard:
+  port: 9334
+  adminToken: "crly_CHANGE_ME_generate_a_secure_token"

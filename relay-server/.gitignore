@@ -1,0 +1,5 @@
+node_modules/
+dist/
+audit.jsonl
+*.js.map
+bun.lock
