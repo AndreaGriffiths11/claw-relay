@@ -1,6 +1,6 @@
 {
   "name": "@acolombiadev/claw-relay",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Give your AI agents a real browser. Secure relay between AI agents and Chrome.",
   "main": "relay-server/dist/index.js",
@@ -12,7 +12,8 @@
     "relay-server/dashboard/dist/",
     "relay-server/package.json",
     "relay-server/config.example.yaml",
-    "mcp/",
+    "mcp/claw-relay-mcp.js",
+    "mcp/package.json",
     "extension/",
     "docs/",
     "start.sh",
