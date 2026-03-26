@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Restrict GITHUB_TOKEN permissions to read-only by default
+permissions:
+  contents: read
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
@@ -12,22 +16,22 @@ jobs:
       run:
         working-directory: relay-server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: npx tsc --noEmit
 
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-      - run: cd relay-server && npm install && npm audit --omit=dev
-      - run: cd mcp && npm install && npm audit --omit=dev
+      - run: cd relay-server && npm ci && npm audit --omit=dev
+      - run: cd mcp && npm ci && npm audit --omit=dev
 
   dashboard:
     runs-on: ubuntu-latest
@@ -35,11 +39,11 @@ jobs:
       run:
         working-directory: relay-server/dashboard
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run build
 
@@ -49,9 +53,9 @@ jobs:
       run:
         working-directory: mcp
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: node --check claw-relay-mcp.js
