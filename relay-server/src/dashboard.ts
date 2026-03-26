@@ -273,8 +273,10 @@ export function startDashboard(
   };
 
   // Serve static assets from dist (JS, CSS, etc.)
+  // Path traversal protection: resolve and verify the path stays within distDir
   app.get('/assets/*', (c) => {
-    const filePath = path.join(distDir, c.req.path);
+    const filePath = path.resolve(distDir, c.req.path.slice(1));
+    if (!filePath.startsWith(path.resolve(distDir))) return c.notFound();
     if (fs.existsSync(filePath)) {
       const ext = path.extname(filePath);
       const content = fs.readFileSync(filePath);
