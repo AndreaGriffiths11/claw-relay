@@ -4,13 +4,15 @@ server:
 
 agents:
   deploy-bot:
-    token: "crly_CHANGE_ME_use_bunx_claw_relay_to_auto_generate"
+    # Generate a token with: npx claw-relay (auto-generates on first run)
+    # Or create one manually: node -e "console.log('crly_' + require('crypto').randomBytes(24).toString('hex'))"
+    token: "crly_CHANGE_ME_generate_a_secure_token"
     scopes: ["read", "interact", "navigate"]
     allowlist: ["dash.cloudflare.com", "github.com"]
     rateLimit: 30
 
   research-bot:
-    token: "crly_CHANGE_ME_use_bunx_claw_relay_to_auto_generate"
+    token: "crly_CHANGE_ME_generate_a_secure_token"
     scopes: ["read"]
     allowlist: ["*"]
     rateLimit: 60
@@ -29,4 +31,4 @@ engine:
 
 dashboard:
   port: 9334
-  adminToken: "crly_CHANGE_ME_use_bunx_claw_relay_to_auto_generate"
+  adminToken: "crly_CHANGE_ME_generate_a_secure_token"

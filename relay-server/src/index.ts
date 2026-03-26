@@ -161,7 +161,64 @@ async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessag
   const agentCfg = state.agentConfig!;
   const reqId = msg.request_id;
 
-  if (!hasPermission(agentCfg.scopes, msg.type)) {
+  // Handle batch at protocol layer — enforce security per sub-action
+  if (msg.type === 'batch') {
+    if (!hasPermission(agentCfg.scopes, 'batch')) {
+      send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks scope for 'batch'`, request_id: reqId });
+      audit.log({ agent_id: agentId, action: 'batch', ok: false, duration_ms: 0, error: 'permission_denied' });
+      return;
+    }
+
+    const results: Array<{ ok: boolean; action?: string; data?: string; error?: string }> = [];
+    const startTime = Date.now();
+
+    for (const action of (msg.actions || [])) {
+      // Check permission for each sub-action
+      if (!hasPermission(agentCfg.scopes, action.type, action)) {
+        results.push({ ok: false, action: action.type, error: `Agent lacks scope for '${action.type}'` });
+        audit.log({ agent_id: agentId, action: action.type, ok: false, duration_ms: 0, error: 'permission_denied' });
+        if (msg.stopOnError) break;
+        continue;
+      }
+
+      // Rate limit each sub-action
+      if (!rateLimiter.check(agentId, agentCfg.rateLimit)) {
+        results.push({ ok: false, action: action.type, error: 'Rate limit exceeded' });
+        audit.log({ agent_id: agentId, action: action.type, ok: false, duration_ms: 0, error: 'rate_limited' });
+        if (msg.stopOnError) break;
+        continue;
+      }
+
+      // Blocklist check per sub-action
+      const blockError = await checkUrlRestrictions(action, agentCfg);
+      if (blockError) {
+        results.push({ ok: false, action: action.type, error: blockError.reason });
+        audit.log({ agent_id: agentId, action: action.type, target: blockError.url, ok: false, duration_ms: 0, error: 'site_blocked' });
+        if (msg.stopOnError) break;
+        continue;
+      }
+
+      // Execute the sub-action
+      const result = await engine.execute(action);
+      const target = action.ref || action.url || action.key || undefined;
+      agentAction(agentId, action.type);
+      audit.log({ agent_id: agentId, action: action.type, target, ok: result.ok, duration_ms: 0, error: result.error });
+
+      if (result.ok) {
+        results.push({ ok: true, action: action.type, data: result.data });
+      } else {
+        results.push({ ok: false, action: action.type, error: result.error });
+        if (msg.stopOnError) break;
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    audit.log({ agent_id: agentId, action: 'batch', ok: true, duration_ms: duration });
+    send(ws, { type: 'result', action: 'batch', ok: true, data: JSON.stringify({ results }), request_id: reqId });
+    return;
+  }
+
+  if (!hasPermission(agentCfg.scopes, msg.type, msg)) {
     send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks scope for '${msg.type}'`, request_id: reqId });
     audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
     return;
