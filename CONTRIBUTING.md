@@ -46,7 +46,7 @@ Thanks for wanting to contribute! Here's how to get started.
 ```
 relay-server/           # Node.js/TypeScript
 ├── src/
-│   ├── cli.ts          # CLI entry point (npx claw-relay)
+│   ├── cli.ts          # CLI entry point (npx @acolombiadev/claw-relay)
 │   ├── index.ts        # WebSocket server, relay logic
 │   ├── engine.ts       # Chrome integration via playwright-core (CDP)
 │   ├── dashboard.ts    # HTTP dashboard server
