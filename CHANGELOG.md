@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- docs: add Agent Skills section to README ([#59](https://github.com/AndreaGriffiths11/claw-relay/pull/59)) — 2026-03-27
 - chore: update npm package name to @acolombiadev/claw-relay ([#58](https://github.com/AndreaGriffiths11/claw-relay/pull/58)) — 2026-03-26
 
 
