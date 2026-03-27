@@ -163,6 +163,18 @@ npx @acolombiadev/claw-relay [options]
 | [Dashboard](docs/dashboard.md) | Web UI for monitoring |
 | [Tunnels](docs/tunnels.md) | Remote access |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
+| [Responsible Use](docs/responsible-use.md) | When to use Claw Relay (and when not to) |
+
+## Agent Skills
+
+Drop-in skill files that teach AI agents how to use Claw Relay:
+
+| | |
+|---|---|
+| [Browser Skill](skills/browser/SKILL.md) | Teaches any agent to navigate, click, type, screenshot — works with any framework |
+| [OpenClaw Skill](skills/openclaw/SKILL.md) | Standalone relay client for OpenClaw, nanobot, ZeroClaw (no MCP required) |
+
+Copy the relevant `SKILL.md` into your agent's skills directory, or point your agent at the file directly.
 
 ## Built With
 
