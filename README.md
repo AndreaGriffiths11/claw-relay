@@ -163,6 +163,7 @@ npx @acolombiadev/claw-relay [options]
 | [Dashboard](docs/dashboard.md) | Web UI for monitoring |
 | [Tunnels](docs/tunnels.md) | Remote access |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues |
+| [Responsible Use](docs/responsible-use.md) | When to use Claw Relay (and when not to) |
 
 ## Agent Skills
 
