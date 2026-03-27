@@ -54,8 +54,6 @@ cd mcp && npm install   # install dependencies
 | `browser_resize` | `width`, `height`, `targetId?` | Resize viewport |
 | `browser_pdf` | `targetId?` | Generate PDF of current page |
 
-> **Note:** The MCP server source (`mcp/claw-relay-mcp.js`) will be updated in a separate PR to implement the new tools. This documents the target API.
-
 ## Usage with Copilot
 
 **Local agent (same machine as relay):**
