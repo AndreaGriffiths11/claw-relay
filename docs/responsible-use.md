@@ -97,9 +97,27 @@ Be aggressive with allowlists. Avoid broad wildcard access unless the environmen
 
 Don't let the agent perform high-impact actions without review. This matters most for:
 
-- Actions that create public content (comments, issues, posts)
-- Anything involving payments or account settings
-- Operations that affect other users
+- Posting content or submitting forms
+- Editing settings or deleting data
+- Working in admin, billing, or account management screens
+
+### Start with low rate limits
+
+```yaml
+agents:
+  my-agent:
+    rateLimit: 15  # conservative, increase as you build trust
+```
+
+Low limits make mistakes easier to catch and harder to scale.
+
+### Treat screenshots and snapshots as sensitive
+
+Browser captures may contain private repo names, tokens visible in page content, internal dashboards, or personal data. Handle them like sensitive application data.
+
+### Use a separate browser profile
+
+Claw Relay already uses a dedicated profile at `~/.claw-relay/chrome-data/`. Don't share it with your normal browsing. This avoids exposing unrelated sessions, cookies, and personal context.
 
 ### Monitor the audit log
 
