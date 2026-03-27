@@ -218,6 +218,46 @@ server.tool("browser_close", "Close the current browser tab.", {}, async () => {
   return { content: [{ type: "text", text: result.data || "Closed" }] };
 });
 
+server.tool("browser_drag", "Drag an element from one location to another. Requires start and end refs from browser_snapshot.", { startRef: z.string(), endRef: z.string() }, async ({ startRef, endRef }) => {
+  const result = await sendAction({ type: "drag", startRef, endRef });
+  return { content: [{ type: "text", text: result.data || "Dragged" }] };
+});
+
+server.tool("browser_scroll_into_view", "Scroll an element into view. Requires a ref from browser_snapshot.", { ref: z.string() }, async ({ ref }) => {
+  const result = await sendAction({ type: "scrollIntoView", ref });
+  return { content: [{ type: "text", text: result.data || "Scrolled into view" }] };
+});
+
+server.tool("browser_wait", "Wait for a condition to be met. Supports: text, textGone, selector, url, loadState (networkidle|domcontentloaded|load), or a custom JS function.", { timeMs: z.number().optional(), text: z.string().optional(), textGone: z.string().optional(), selector: z.string().optional(), url: z.string().optional(), loadState: z.enum(["networkidle", "domcontentloaded", "load"]).optional(), fn: z.string().optional(), timeoutMs: z.number().optional() }, async (params) => {
+  const result = await sendAction({ type: "wait", ...params });
+  return { content: [{ type: "text", text: result.data || "Condition met" }] };
+});
+
+server.tool("browser_console", "Get console messages from the page. Optional level filter (log|warning|error). Set clear=true to clear the log.", { level: z.enum(["log", "warning", "error"]).optional(), clear: z.boolean().optional() }, async (params) => {
+  const result = await sendAction({ type: "console", ...params });
+  return { content: [{ type: "text", text: result.data || "No console messages" }] };
+});
+
+server.tool("browser_network", "Get network requests from the page. Optional filter for request type (xhr|fetch|document|image|etc). Set clear=true to clear the log.", { filter: z.string().optional(), clear: z.boolean().optional() }, async (params) => {
+  const result = await sendAction({ type: "network", ...params });
+  return { content: [{ type: "text", text: result.data || "No network requests" }] };
+});
+
+server.tool("browser_pdf", "Generate a PDF of the current page. Returns the PDF as base64.", {}, async () => {
+  const result = await sendAction({ type: "pdf" });
+  return { content: [{ type: "text", text: result.data || "PDF generated" }] };
+});
+
+server.tool("browser_resize", "Resize the browser viewport to a specific width and height in pixels.", { width: z.number(), height: z.number() }, async ({ width, height }) => {
+  const result = await sendAction({ type: "resize", width, height });
+  return { content: [{ type: "text", text: result.data || "Resized" }] };
+});
+
+server.tool("browser_batch", "Execute multiple actions in sequence. Stops on first error if stopOnError is true.", { actions: z.array(z.record(z.any())), stopOnError: z.boolean().optional() }, async ({ actions, stopOnError }) => {
+  const result = await sendAction({ type: "batch", actions, stopOnError });
+  return { content: [{ type: "text", text: result.data || "Batch executed" }] };
+});
+
 // --- Start ---
 async function main() {
   // Start stdio transport FIRST so Copilot CLI sees the MCP server immediately
