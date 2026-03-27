@@ -1,0 +1,10 @@
+node_modules
+.git
+*.md
+!README.md
+relay-server/dashboard/node_modules
+relay-server/node_modules
+extension/
+skills/
+docs/
+.github/
