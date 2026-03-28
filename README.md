@@ -6,7 +6,7 @@
 
 Give your AI agents a real browser.
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/claw-relay?referralCode=a2vuTz)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/claw-relay?referralCode=a2vuTz&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 ## Quick Start
 
