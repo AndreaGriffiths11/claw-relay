@@ -309,6 +309,11 @@ async function checkUrlRestrictions(
 
 const server = createServer((req, res) => {
   if (!req.headers.upgrade) {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+      return;
+    }
     res.writeHead(200);
     res.end('Claw Relay™ WebSocket server');
     return;
