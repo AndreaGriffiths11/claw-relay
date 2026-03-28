@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- feat: add /health endpoint ([#63](https://github.com/AndreaGriffiths11/claw-relay/pull/63)) — 2026-03-28
 - feat: Dockerfile + Railway template support ([#61](https://github.com/AndreaGriffiths11/claw-relay/pull/61)) — 2026-03-27
 - feat: implement all 8 missing MCP tools ([#60](https://github.com/AndreaGriffiths11/claw-relay/pull/60)) — 2026-03-27
 - docs: add Agent Skills section to README ([#59](https://github.com/AndreaGriffiths11/claw-relay/pull/59)) — 2026-03-27
