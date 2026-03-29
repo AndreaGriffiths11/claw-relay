@@ -79,8 +79,10 @@ npx @acolombiadev/claw-relay [options]
 
 For accessing your normal Chrome instead of the dedicated window:
 
-1. `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
+1. Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/claw-relay/jkididiajaipgoochodhlgkdhganebfp)
 2. Click the toolbar icon on any tab to share it with the relay
+
+> **For development:** `chrome://extensions` → Developer mode → Load unpacked → select `extension/`
 
 No CDP flag needed — the extension bridges directly.
 

@@ -56,13 +56,19 @@ Matches the engine.ts ref system:
 
 ## Install
 
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/claw-relay/jkididiajaipgoochodhlgkdhganebfp), then:
+
+1. Click the extension icon → **⚙ Settings**
+2. Set your **Relay URL** (default: `ws://localhost:9333`)
+3. Set your **Token** — find it in `relay-server/config.yaml` under your agent's `token` field
+4. Set your **Agent ID** — matches the agent name in `config.yaml`
+
+### Development (Load Unpacked)
+
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked** → select this `extension/` folder
-4. Click the extension icon → **⚙ Settings**
-5. Set your **Relay URL** (default: `ws://localhost:9333`)
-6. Set your **Token** — find it in `relay-server/config.yaml` under your agent's `token` field
-7. Set your **Agent ID** — matches the agent name in `config.yaml`
+4. Configure settings as above
 
 ### Where's the token?
 

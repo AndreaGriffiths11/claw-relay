@@ -9,7 +9,7 @@
 | "Who's using Chrome?" dialog | The CLI uses `--user-data-dir` to skip this. If you see it, update to the latest version |
 | Chrome window not visible | It may have launched off-screen. Kill and restart: `pkill -f "claw-relay/chrome-data" && npx @acolombiadev/claw-relay` |
 | Not signed into GitHub/etc. | Sign in once in the Claw Relay Chrome window. Logins persist in `~/.claw-relay/chrome-data/` |
-| Want to use your normal Chrome | Install the Chrome Extension (load unpacked from `extension/`) — no separate window needed |
+| Want to use your normal Chrome | Install the [Chrome Extension](https://chromewebstore.google.com/detail/claw-relay/jkididiajaipgoochodhlgkdhganebfp) from the Chrome Web Store — no separate window needed |
 
 ## Connection Issues
 
