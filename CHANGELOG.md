@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- docs: add Chrome Web Store install link ([#65](https://github.com/AndreaGriffiths11/claw-relay/pull/65)) — 2026-03-29
 - fix: update Railway deploy button URL ([#64](https://github.com/AndreaGriffiths11/claw-relay/pull/64)) — 2026-03-28
 - docs: add Deploy on Railway button ([#62](https://github.com/AndreaGriffiths11/claw-relay/pull/62)) — 2026-03-28
 - feat: add /health endpoint ([#63](https://github.com/AndreaGriffiths11/claw-relay/pull/63)) — 2026-03-28
