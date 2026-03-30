@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump @tanstack/react-router from 1.168.4 to 1.168.8 in /relay-server/dashboard ([#66](https://github.com/AndreaGriffiths11/claw-relay/pull/66)) — 2026-03-30
 - docs: add Chrome Web Store install link ([#65](https://github.com/AndreaGriffiths11/claw-relay/pull/65)) — 2026-03-29
 - fix: update Railway deploy button URL ([#64](https://github.com/AndreaGriffiths11/claw-relay/pull/64)) — 2026-03-28
 - docs: add Deploy on Railway button ([#62](https://github.com/AndreaGriffiths11/claw-relay/pull/62)) — 2026-03-28
