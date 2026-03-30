@@ -21,16 +21,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy package files and install
+# Copy package files and install (include devDeps for build)
 COPY relay-server/package*.json ./relay-server/
-RUN cd relay-server && npm ci --omit=dev
+RUN cd relay-server && npm ci
 
 # Copy source
 COPY relay-server/ ./relay-server/
 COPY mcp/ ./mcp/
 
-# Build
-RUN cd relay-server && npm run build
+# Build server (tsup) + dashboard (vite)
+RUN cd relay-server && npx tsup && npm run build:dashboard
+
+# Prune devDependencies
+RUN cd relay-server && npm prune --omit=dev
 
 # Set Chrome path for Playwright CDP
 ENV CHROME_PATH=/usr/bin/chromium
