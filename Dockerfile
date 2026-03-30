@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcomposite1 \
     libxdamage1 \
     libxrandr2 \
+    openssl \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
