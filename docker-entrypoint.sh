@@ -21,7 +21,7 @@ server:
 agents:
   default:
     token: "${AGENT_TOKEN}"
-    scopes: ["read", "interact", "navigate", "evaluate"]
+    scopes: ["read", "interact", "navigate", "execute"]
     allowlist: ["*"]
     rateLimit: 60
 
