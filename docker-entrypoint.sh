@@ -6,8 +6,8 @@ CONFIG_FILE="$CONFIG_DIR/config.yaml"
 
 mkdir -p "$CONFIG_DIR"
 
-# Generate config if it doesn't exist
-if [ ! -f "$CONFIG_FILE" ]; then
+# Always regenerate config (env vars are the source of truth)
+if true; then
   AGENT_TOKEN="${AGENT_TOKEN:-crly_$(openssl rand -hex 24)}"
   ADMIN_TOKEN="${ADMIN_TOKEN:-crly_$(openssl rand -hex 24)}"
   PORT="${PORT:-9333}"
