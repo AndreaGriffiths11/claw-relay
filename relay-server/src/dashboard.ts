@@ -169,6 +169,11 @@ export function startDashboard(
 
   app.get('/api/status', (c) => c.json(getState()));
 
+  // --- Denial tracking endpoint ---
+  app.get('/api/denials', (c) => {
+    const { getAllDenialStates } = require('./permissions');
+    return c.json(getAllDenialStates());
+  });
   // --- Audit log endpoints ---
 
   app.get('/api/audit', (c) => {
