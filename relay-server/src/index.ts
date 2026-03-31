@@ -9,7 +9,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { loadConfig, authenticate, type Config, type AgentConfig } from './auth';
 import { parseMessage, isAuthMessage, isActionMessage, type ActionMessage, type OutgoingMessage } from './protocol';
-import { hasPermission } from './permissions';
+import { hasPermission, recordDenial, recordSuccess, shouldWarn, getDenialWarning, getAllDenialStates } from './permissions';
 import { isAllowed } from './allowlist';
 import { RateLimiter } from './rate-limiter';
 import { AuditLogger } from './audit-logger';
@@ -197,6 +197,7 @@ async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessag
     for (const action of (msg.actions || [])) {
       // Check permission for each sub-action
       if (!hasPermission(agentCfg.scopes, action.type, action)) {
+        recordDenial(agentId, action.type);
         results.push({ ok: false, action: action.type, error: `Agent lacks scope for '${action.type}'` });
         audit.log({ agent_id: agentId, action: action.type, ok: false, duration_ms: 0, error: 'permission_denied' });
         if (msg.stopOnError) break;
@@ -241,6 +242,10 @@ async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessag
   }
 
   if (!hasPermission(agentCfg.scopes, msg.type, msg)) {
+    const state = recordDenial(agentId, msg.type);
+    if (shouldWarn(state)) {
+      console.warn(`[denial-tracking] ${getDenialWarning(agentId, state)}`);
+    }
     send(ws, { type: 'error', code: 'permission_denied', message: `Agent lacks scope for '${msg.type}'`, request_id: reqId });
     audit.log({ agent_id: agentId, action: msg.type, ok: false, duration_ms: 0, error: 'permission_denied' });
     return;
@@ -265,6 +270,7 @@ async function handleAction(ws: WebSocket, state: ClientState, msg: ActionMessag
   const target = msg.ref || msg.url || msg.key || undefined;
 
   agentAction(agentId, msg.type);
+  recordSuccess(agentId);
   audit.log({ agent_id: agentId, action: msg.type, target, ok: result.ok, duration_ms: duration, error: result.error });
 
   if (!result.ok) {
