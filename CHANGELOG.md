@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- fix: scan all browser contexts for tabs ([#69](https://github.com/AndreaGriffiths11/claw-relay/pull/69)) — 2026-03-31
 - feat: denial tracking for agent permissions ([#68](https://github.com/AndreaGriffiths11/claw-relay/pull/68)) — 2026-03-31
 - fix: add openssl and curl to Docker image ([#67](https://github.com/AndreaGriffiths11/claw-relay/pull/67)) — 2026-03-30
 - chore(deps): bump @tanstack/react-router from 1.168.4 to 1.168.8 in /relay-server/dashboard ([#66](https://github.com/AndreaGriffiths11/claw-relay/pull/66)) — 2026-03-30
