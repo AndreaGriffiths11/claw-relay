@@ -109,8 +109,7 @@ export class Engine {
   }
 
   private getPages(browser: Browser): Page[] {
-    const ctx = browser.contexts()[0];
-    return ctx ? ctx.pages() : [];
+    return browser.contexts().flatMap(ctx => ctx.pages());
   }
 
   private async getActivePage(createIfMissing = false): Promise<Page> {
@@ -122,7 +121,7 @@ export class Engine {
     });
     if (browsable.length === 0) {
       if (createIfMissing) {
-        const ctx = browser.contexts()[0];
+        const ctx = browser.contexts()[0] ?? await browser.newContext();
         if (!ctx) throw new Error('No browser context');
         const newPage = await ctx.newPage();
         this.setupPageListeners(newPage);
