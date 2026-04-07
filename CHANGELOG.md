@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump playwright-core from 1.58.2 to 1.59.1 ([#75](https://github.com/AndreaGriffiths11/claw-relay/pull/75)) — 2026-04-07
 - chore(deps): bump @hono/node-server from 1.19.11 to 1.19.12 ([#72](https://github.com/AndreaGriffiths11/claw-relay/pull/72)) — 2026-04-07
 - chore(deps): bump @hono/node-server from 1.19.11 to 1.19.12 in /relay-server ([#79](https://github.com/AndreaGriffiths11/claw-relay/pull/79)) — 2026-04-07
 - chore(deps): bump playwright-core from 1.58.2 to 1.59.1 in /relay-server ([#78](https://github.com/AndreaGriffiths11/claw-relay/pull/78)) — 2026-04-07
