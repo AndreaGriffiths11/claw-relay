@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump vite 6→8 and @vitejs/plugin-react 4→5 in dashboard ([#82](https://github.com/AndreaGriffiths11/claw-relay/pull/82)) — 2026-04-07
 - chore(deps): bump @tanstack/react-router from 1.168.8 to 1.168.10 in /relay-server/dashboard ([#80](https://github.com/AndreaGriffiths11/claw-relay/pull/80)) — 2026-04-07
 - chore(deps): bump hono from 4.12.9 to 4.12.11 in /relay-server ([#74](https://github.com/AndreaGriffiths11/claw-relay/pull/74)) — 2026-04-07
 - chore(deps): bump hono from 4.12.9 to 4.12.11 ([#76](https://github.com/AndreaGriffiths11/claw-relay/pull/76)) — 2026-04-07
