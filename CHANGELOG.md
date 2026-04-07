@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump @hono/node-server from 1.19.11 to 1.19.12 in /relay-server ([#79](https://github.com/AndreaGriffiths11/claw-relay/pull/79)) — 2026-04-07
 - chore(deps): bump playwright-core from 1.58.2 to 1.59.1 in /relay-server ([#78](https://github.com/AndreaGriffiths11/claw-relay/pull/78)) — 2026-04-07
 - chore(deps-dev): bump @types/node from 25.5.0 to 25.5.2 in /relay-server ([#71](https://github.com/AndreaGriffiths11/claw-relay/pull/71)) — 2026-04-07
 - chore(deps-dev): bump vite from 6.4.1 to 6.4.2 in /relay-server/dashboard ([#81](https://github.com/AndreaGriffiths11/claw-relay/pull/81)) — 2026-04-07
