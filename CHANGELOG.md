@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps-dev): bump @types/node from 25.5.0 to 25.5.2 in /relay-server ([#71](https://github.com/AndreaGriffiths11/claw-relay/pull/71)) — 2026-04-07
 - chore(deps-dev): bump vite from 6.4.1 to 6.4.2 in /relay-server/dashboard ([#81](https://github.com/AndreaGriffiths11/claw-relay/pull/81)) — 2026-04-07
 - fix: scan all browser contexts for tabs ([#69](https://github.com/AndreaGriffiths11/claw-relay/pull/69)) — 2026-03-31
 - feat: denial tracking for agent permissions ([#68](https://github.com/AndreaGriffiths11/claw-relay/pull/68)) — 2026-03-31
