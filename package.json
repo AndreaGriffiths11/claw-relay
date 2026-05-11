@@ -49,7 +49,7 @@
   "author": "Andrea Griffiths",
   "license": "MIT",
   "dependencies": {
-    "@hono/node-server": "^1.13.0",
+    "@hono/node-server": "^2.0.2",
     "hono": "^4.12.8",
     "playwright-core": "^1.58.0",
     "ws": "^8.20.0",
