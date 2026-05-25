@@ -15,7 +15,7 @@
     "hono": "^4.12.11",
     "playwright-core": "^1.59.1",
     "typescript": "^6.0.2",
-    "ws": "^8.18.0",
+    "ws": "^8.21.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
