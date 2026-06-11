@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump playwright-core from 1.59.1 to 1.60.0 ([#125](https://github.com/AndreaGriffiths11/claw-relay/pull/125)) — 2026-06-11
 - chore(deps): bump react from 19.2.4 to 19.2.5 in /relay-server/dashboard ([#97](https://github.com/AndreaGriffiths11/claw-relay/pull/97)) — 2026-06-11
 - chore(deps): bump @hono/node-server from 1.19.11 to 1.19.13 in /mcp ([#86](https://github.com/AndreaGriffiths11/claw-relay/pull/86)) — 2026-06-11
 - chore(deps): bump ws from 8.20.0 to 8.20.1 ([#127](https://github.com/AndreaGriffiths11/claw-relay/pull/127)) — 2026-06-11
