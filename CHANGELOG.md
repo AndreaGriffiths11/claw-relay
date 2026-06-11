@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump @tanstack/react-query from 5.96.2 to 5.99.0 in /relay-server/dashboard ([#96](https://github.com/AndreaGriffiths11/claw-relay/pull/96)) — 2026-06-11
 - chore(deps): bump ws from 8.19.0 to 8.20.1 in /mcp ([#128](https://github.com/AndreaGriffiths11/claw-relay/pull/128)) — 2026-06-11
 - chore(deps): bump hono from 4.12.8 to 4.12.25 in /mcp ([#142](https://github.com/AndreaGriffiths11/claw-relay/pull/142)) — 2026-06-11
 - chore(deps): bump playwright-core from 1.59.1 to 1.60.0 ([#125](https://github.com/AndreaGriffiths11/claw-relay/pull/125)) — 2026-06-11
