@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump ip-address and express-rate-limit in /mcp ([#114](https://github.com/AndreaGriffiths11/claw-relay/pull/114)) — 2026-06-11
 - chore(deps): bump @hono/node-server from 1.19.12 to 2.0.3 ([#124](https://github.com/AndreaGriffiths11/claw-relay/pull/124)) — 2026-06-11
 - chore(deps): bump actions/setup-node from 4.4.0 to 6.4.0 ([#102](https://github.com/AndreaGriffiths11/claw-relay/pull/102)) — 2026-06-11
 - chore(deps): bump @tanstack/react-query from 5.96.2 to 5.99.0 in /relay-server/dashboard ([#96](https://github.com/AndreaGriffiths11/claw-relay/pull/96)) — 2026-06-11
