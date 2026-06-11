@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump postcss from 8.5.8 to 8.5.14 in /relay-server/dashboard ([#123](https://github.com/AndreaGriffiths11/claw-relay/pull/123)) — 2026-06-11
 - chore(deps): bump qs from 6.15.0 to 6.15.2 in /mcp ([#134](https://github.com/AndreaGriffiths11/claw-relay/pull/134)) — 2026-06-11
 - chore(deps): bump hono from 4.12.18 to 4.12.23 in /relay-server ([#137](https://github.com/AndreaGriffiths11/claw-relay/pull/137)) — 2026-06-11
 - chore(deps): bump AndreaGriffiths11/proof-agent from 1.0.2 to 1.0.8 ([#101](https://github.com/AndreaGriffiths11/claw-relay/pull/101)) — 2026-06-11
