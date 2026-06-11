@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- chore(deps): bump AndreaGriffiths11/proof-agent from 1.0.2 to 1.0.8 ([#101](https://github.com/AndreaGriffiths11/claw-relay/pull/101)) — 2026-06-11
 - chore(deps): bump fast-uri from 3.1.0 to 3.1.2 in /mcp ([#118](https://github.com/AndreaGriffiths11/claw-relay/pull/118)) — 2026-05-11
 - chore(deps): bump vite 6→8 and @vitejs/plugin-react 4→5 in dashboard ([#82](https://github.com/AndreaGriffiths11/claw-relay/pull/82)) — 2026-04-07
 - chore(deps): bump @tanstack/react-router from 1.168.8 to 1.168.10 in /relay-server/dashboard ([#80](https://github.com/AndreaGriffiths11/claw-relay/pull/80)) — 2026-04-07
