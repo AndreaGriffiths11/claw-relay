@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.4",
-    "hono": "^4.12.23",
+    "hono": "^4.12.25",
     "playwright-core": "^1.60.0",
     "typescript": "^6.0.3",
     "ws": "^8.21.0",
